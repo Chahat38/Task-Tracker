@@ -1,0 +1,50 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Team member user profile with managerial role and designation",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique Firebase Authentication UID" },
+        "name": { "type": "string", "description": "Full display name" },
+        "designation": { "type": "string", "description": "Official job title/designation" },
+        "email": { "type": "string", "format": "email", "description": "Work email address" },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "member", "intern"], "description": "System permission level" },
+        "status": { "type": "string", "enum": ["pending", "active", "rejected"], "description": "First-time approval gate status" },
+        "addedBy": { "type": "string", "description": "UID or name of creator" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "designation", "email", "role", "status", "createdAt"]
+    },
+    "ProgressEntry": {
+      "title": "ProgressEntry",
+      "description": "Daily progress report logged by a team member",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the member submitting progress" },
+        "userName": { "type": "string", "description": "Name at submission time" },
+        "userDesignation": { "type": "string", "description": "Designation at submission time" },
+        "userRole": { "type": "string", "enum": ["super_admin", "admin", "member", "intern"] },
+        "completedToday": { "type": "string", "description": "What was completed today" },
+        "pendingWork": { "type": "string", "description": "What is pending or remaining" },
+        "currentlyWorking": { "type": "string", "description": "What the member is currently working on" },
+        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "description": "Entry date in YYYY-MM-DD" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "userDesignation", "completedToday", "pendingWork", "currentlyWorking", "date", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Profiles of team members, managers, and co-founders"
+    },
+    "/progress_entries/{entryId}": {
+      "schema": { "$ref": "#/entities/ProgressEntry" },
+      "description": "Daily progress tracking entries submitted by team members"
+    }
+  }
+}

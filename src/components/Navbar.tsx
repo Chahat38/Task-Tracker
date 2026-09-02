@@ -1,0 +1,277 @@
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { RoleBadge } from './RoleBadge';
+import { getInitials } from '../utils/rules';
+import {
+  FileText,
+  Users,
+  LayoutDashboard,
+  LogOut,
+  ShieldAlert,
+  Menu,
+  X,
+  CheckSquare
+} from 'lucide-react';
+
+interface NavbarProps {
+  currentTab: 'personal' | 'team' | 'users' | 'approvals';
+  onTabChange: (tab: 'personal' | 'team' | 'users' | 'approvals') => void;
+  pendingCount?: number;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  currentTab,
+  onTabChange,
+  pendingCount = 0,
+}) => {
+  const { currentUser, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  if (!currentUser) return null;
+
+  const isSuperAdmin = currentUser.role === 'super_admin';
+  const isAdmin = currentUser.role === 'admin';
+  const canViewTeam = isSuperAdmin || isAdmin;
+  const canManageUsers = isSuperAdmin || isAdmin;
+
+  const handleSelectTab = (tab: 'personal' | 'team' | 'users' | 'approvals') => {
+    onTabChange(tab);
+    setMobileMenuOpen(false);
+  };
+
+  return (
+    <>
+      {/* Desktop High Density Sidebar */}
+      <aside
+        id="desktop-sidebar"
+        className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col shrink-0 h-screen sticky top-0"
+      >
+        {/* Brand Header */}
+        <div className="p-6 border-b border-slate-100">
+          <h1 className="text-xl font-bold tracking-tight text-indigo-600">AGENCY FLOW</h1>
+          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-1">
+            Internal Progress Tracker
+          </p>
+        </div>
+
+        {/* Sidebar Navigation */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {/* Team Feed (Team Progress) */}
+          {canViewTeam && (
+            <button
+              id="nav-tab-team"
+              type="button"
+              onClick={() => handleSelectTab('team')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
+                currentTab === 'team'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <LayoutDashboard className="w-5 h-5 shrink-0" />
+              <span>Real-time Feed</span>
+            </button>
+          )}
+
+          {/* Personal Progress */}
+          {!isSuperAdmin && (
+            <button
+              id="nav-tab-personal"
+              type="button"
+              onClick={() => handleSelectTab('personal')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
+                currentTab === 'personal'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <FileText className="w-5 h-5 shrink-0" />
+              <span>My Progress</span>
+            </button>
+          )}
+
+          {/* Team Management */}
+          {canManageUsers && (
+            <button
+              id="nav-tab-users"
+              type="button"
+              onClick={() => handleSelectTab('users')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer relative ${
+                currentTab === 'users'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <Users className="w-5 h-5 shrink-0" />
+              <span>Team Management</span>
+            </button>
+          )}
+
+          {/* Pending Approvals: ONLY visible to Managing Director (super_admin) */}
+          {isSuperAdmin && (
+            <button
+              id="nav-tab-approvals"
+              type="button"
+              onClick={() => handleSelectTab('approvals')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer relative ${
+                currentTab === 'approvals'
+                  ? 'bg-amber-50 text-amber-900 font-semibold'
+                  : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              <CheckSquare className="w-5 h-5 shrink-0 text-amber-600" />
+              <span>Pending Approvals</span>
+              {pendingCount > 0 && (
+                <span className="ml-auto bg-amber-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          )}
+        </nav>
+
+        {/* User Profile Footer */}
+        <div className="p-4 border-t border-slate-100">
+          <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                {getInitials(currentUser.name)}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-bold leading-none text-slate-900 truncate">
+                    {currentUser.name}
+                  </p>
+                  <RoleBadge
+                    name={currentUser.name}
+                    role={currentUser.role}
+                    designation={currentUser.designation}
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-tight font-semibold truncate">
+                  {currentUser.designation || 'Team Member'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              id="button-logout"
+              type="button"
+              onClick={logout}
+              title="Sign Out"
+              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0 ml-1"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Top Header */}
+      <header className="md:hidden bg-white border-b border-slate-200 sticky top-0 z-30 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+          <div>
+            <h1 className="text-base font-bold tracking-tight text-indigo-600 leading-none">
+              AGENCY FLOW
+            </h1>
+            <p className="text-[9px] text-slate-400 font-semibold uppercase tracking-widest mt-0.5">
+              Internal Progress Tracker
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+            {getInitials(currentUser.name)}
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            title="Sign Out"
+            className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </header>
+
+      {/* Mobile Menu Dropdown */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 space-y-1 shadow-sm sticky top-14 z-20">
+          {canViewTeam && (
+            <button
+              type="button"
+              onClick={() => handleSelectTab('team')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs flex items-center gap-3 ${
+                currentTab === 'team'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span>Real-time Feed</span>
+            </button>
+          )}
+
+          {!isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => handleSelectTab('personal')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs flex items-center gap-3 ${
+                currentTab === 'personal'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>My Progress</span>
+            </button>
+          )}
+
+          {canManageUsers && (
+            <button
+              type="button"
+              onClick={() => handleSelectTab('users')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs flex items-center gap-3 relative ${
+                currentTab === 'users'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              <span>Team Management</span>
+            </button>
+          )}
+
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => handleSelectTab('approvals')}
+              className={`w-full px-3 py-2 rounded-lg font-medium text-xs flex items-center gap-3 relative ${
+                currentTab === 'approvals'
+                  ? 'bg-amber-50 text-amber-900 font-semibold'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <CheckSquare className="w-4 h-4 text-amber-600" />
+              <span>Pending Approvals</span>
+              {pendingCount > 0 && (
+                <span className="ml-auto bg-amber-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+};
+
