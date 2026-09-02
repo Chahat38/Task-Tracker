@@ -50,17 +50,20 @@ interface StoreData {
   users: Record<string, any>;
   entries: any[];
   resetPasswords: Record<string, string>; // email -> sha256 of new password
+  credentials: Record<string, string>; // email -> plaintext password set by MD
 }
 
 let store: StoreData = {
   users: {},
   entries: [],
-  resetPasswords: {}
+  resetPasswords: {},
+  credentials: {}
 };
 
 if (fs.existsSync(STORE_FILE)) {
   try {
     store = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
+    if (!store.credentials) store.credentials = {};
   } catch (e) {
     console.error("Error reading store file:", e);
   }
@@ -144,8 +147,30 @@ const DEFAULT_FOUNDING_PROFILES = [
   }
 ];
 
+const DEFAULT_CREDENTIALS: Record<string, string> = {
+  'chahathassanain@gmail.com': 'COFOUNDER-AGENCY-2026',
+  'saeed@agency.com': 'agency2026',
+  'fatima@agency.com': 'agency2026',
+  'maham@agency.com': 'agency2026',
+  'remsha@agency.com': 'agency2026',
+  'shawal@agency.com': 'agency2026'
+};
+
 function seedDefaultUsers() {
   let modified = false;
+  if (!store.credentials) {
+    store.credentials = {};
+    modified = true;
+  }
+
+  for (const [email, pass] of Object.entries(DEFAULT_CREDENTIALS)) {
+    const norm = email.toLowerCase();
+    if (!store.credentials[norm]) {
+      store.credentials[norm] = pass;
+      modified = true;
+    }
+  }
+
   for (const profile of DEFAULT_FOUNDING_PROFILES) {
     const existing = Object.values(store.users).find(
       (u: any) => u.email?.toLowerCase() === profile.email.toLowerCase()
@@ -207,7 +232,7 @@ app.post('/api/auth/super-admin-recovery', (req, res) => {
   });
 });
 
-// Fallback login endpoint (supports normal password, reset passwords, or recovery key as password)
+// Fallback login endpoint (Strictly whitelisted: random emails are rejected!)
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -215,44 +240,76 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase().trim();
-  const isChahat = normalizedEmail.includes('chahat') || normalizedEmail === 'chahathassanain@gmail.com';
+  const isChahat = normalizedEmail === 'chahathassanain@gmail.com' || normalizedEmail.includes('chahat');
 
-  // 1. Check if password is the Secret Recovery Code
+  // Find user in provisioned store
+  let user = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === normalizedEmail);
+
+  // STRICT ACCESS CONTROL: If email is not provisioned and not Chahat, REJECT!
+  if (!user && !isChahat) {
+    return res.status(403).json({
+      success: false,
+      error: 'Access Denied: Unregistered email address. Accounts are provisioned exclusively by agency administration.'
+    });
+  }
+
+  // Ensure Chahat exists
+  if (!user && isChahat) {
+    user = {
+      uid: 'user_chahat',
+      name: 'Chahat',
+      designation: 'Managing Director',
+      email: 'chahathassanain@gmail.com',
+      role: 'super_admin',
+      status: 'active',
+      createdAt: new Date().toISOString()
+    };
+    store.users[user.uid] = user;
+    if (!store.credentials[normalizedEmail]) {
+      store.credentials[normalizedEmail] = 'COFOUNDER-AGENCY-2026';
+    }
+    saveStore();
+  }
+
+  // 1. Check if password is the Secret Recovery Code (for Chahat / MD)
   const isRecoveryKey = verifyRecoveryCode(password);
 
-  // 2. Check if password matches a reset password recorded via recovery reset
+  // 2. Check provisioned password in credentials store or user record
+  const assignedPassword = store.credentials[normalizedEmail] || (user && user.password);
+
+  // 3. Check if password matches a reset password recorded via recovery reset
   const expectedResetHash = store.resetPasswords[normalizedEmail];
   const inputPasswordHash = crypto.createHash('sha256').update(password + normalizedEmail).digest('hex');
   const isResetPasswordMatch = Boolean(expectedResetHash && expectedResetHash === inputPasswordHash);
 
-  // 3. Check if password is one of the standard team passwords
-  const isDefaultPassword = password === 'agency2026' || password === 'admin123';
-
-  const isAuthorized = isRecoveryKey || isResetPasswordMatch || isDefaultPassword;
+  let isAuthorized = false;
+  if (isChahat && isRecoveryKey) {
+    isAuthorized = true;
+  } else if (assignedPassword && assignedPassword === password) {
+    isAuthorized = true;
+  } else if (assignedPassword && assignedPassword.trim().toLowerCase() === password.trim().toLowerCase()) {
+    isAuthorized = true;
+  } else if (isResetPasswordMatch) {
+    isAuthorized = true;
+  }
 
   if (!isAuthorized) {
     return res.status(401).json({
       success: false,
-      error: 'Invalid password. You can use your Secret Recovery Key (COFOUNDER-AGENCY-2026) directly as your password.',
-      canUseRecoveryKey: true
+      error: 'Incorrect password. Please verify credentials provided by agency administration.'
     });
   }
 
-  // Find or provision user
-  let user = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === normalizedEmail);
-  if (!user) {
-    user = {
-      uid: isChahat ? 'user_chahat' : `user_${Date.now()}`,
-      name: isChahat ? 'Chahat' : normalizedEmail.split('@')[0],
-      designation: isChahat ? 'Managing Director' : 'Team Member',
-      email: normalizedEmail,
-      role: isChahat ? 'super_admin' : 'member',
-      status: isChahat ? 'active' : 'pending',
-      createdAt: new Date().toISOString()
-    };
-    store.users[user.uid] = user;
-    saveStore();
-  } else if (isChahat) {
+  // Check account status
+  if (user.status !== 'active') {
+    return res.status(403).json({
+      success: false,
+      error: `Account access is ${user.status === 'pending' ? 'pending approval' : 'inactive'}. Please contact administration.`
+    });
+  }
+
+  // Ensure MD designation and role
+  if (isChahat) {
     user.role = 'super_admin';
     user.status = 'active';
     user.designation = 'Managing Director';
@@ -264,6 +321,105 @@ app.post('/api/auth/login', (req, res) => {
     success: true,
     user
   });
+});
+
+// Admin endpoint: Provision new user with Email and Password
+app.post('/api/admin/provision-user', (req, res) => {
+  const { name, email, designation, role, password } = req.body;
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Name, Email, and Password are required.' });
+  }
+
+  const normEmail = email.toLowerCase().trim();
+
+  // Check if already exists
+  const existing = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === normEmail);
+  if (existing) {
+    return res.status(400).json({ error: 'An account with this email address already exists.' });
+  }
+
+  const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const newUser = {
+    uid,
+    name: name.trim(),
+    email: normEmail,
+    designation: designation?.trim() || (role === 'intern' ? 'Intern' : 'Team Member'),
+    role: role || 'member',
+    status: 'active',
+    createdAt: new Date().toISOString()
+  };
+
+  store.users[uid] = newUser;
+  store.credentials[normEmail] = password.trim();
+  saveStore();
+
+  return res.json({
+    success: true,
+    user: { ...newUser, password: store.credentials[normEmail] }
+  });
+});
+
+// Admin endpoint: Update user details AND/OR password
+app.post('/api/admin/update-credentials', (req, res) => {
+  const { uid, name, email, designation, role, password, status } = req.body;
+  if (!uid || !store.users[uid]) {
+    return res.status(404).json({ error: 'User not found in directory.' });
+  }
+
+  const currentUser = store.users[uid];
+  const oldEmail = (currentUser.email || '').toLowerCase().trim();
+  const newEmail = (email ? email.toLowerCase().trim() : oldEmail);
+
+  if (name) currentUser.name = name.trim();
+  if (designation) currentUser.designation = designation.trim();
+  if (role && currentUser.role !== 'super_admin') currentUser.role = role;
+  if (status) currentUser.status = status;
+  currentUser.updatedAt = new Date().toISOString();
+
+  if (newEmail && newEmail !== oldEmail) {
+    currentUser.email = newEmail;
+    // Migrate credentials
+    if (store.credentials[oldEmail]) {
+      store.credentials[newEmail] = store.credentials[oldEmail];
+      delete store.credentials[oldEmail];
+    }
+  }
+
+  if (password && password.trim()) {
+    store.credentials[currentUser.email.toLowerCase().trim()] = password.trim();
+  }
+
+  saveStore();
+
+  return res.json({
+    success: true,
+    user: {
+      ...currentUser,
+      password: store.credentials[currentUser.email.toLowerCase().trim()]
+    }
+  });
+});
+
+// Admin endpoint: Delete user
+app.post('/api/admin/delete-user', (req, res) => {
+  const { uid } = req.body;
+  if (!uid || !store.users[uid]) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  const user = store.users[uid];
+  if (user.role === 'super_admin' || user.email?.toLowerCase().includes('chahat')) {
+    return res.status(403).json({ error: 'Cannot delete the Managing Director account.' });
+  }
+
+  const normEmail = (user.email || '').toLowerCase().trim();
+  delete store.users[uid];
+  if (normEmail) {
+    delete store.credentials[normEmail];
+  }
+  saveStore();
+
+  return res.json({ success: true, message: 'User removed successfully.' });
 });
 
 // 1. Check recovery key configuration status (NEVER EXPOSES PLAINTEXT)
@@ -363,13 +519,23 @@ app.post('/api/auth/verify-reset-password', (req, res) => {
 
 // 5. Shared state endpoints for real-time fallback sync
 app.get('/api/sync/users', (req, res) => {
-  res.json({ users: Object.values(store.users) });
+  const usersWithPasswords = Object.values(store.users).map((u: any) => {
+    const normEmail = (u.email || '').toLowerCase().trim();
+    return {
+      ...u,
+      password: store.credentials[normEmail] || ''
+    };
+  });
+  res.json({ users: usersWithPasswords });
 });
 
 app.post('/api/sync/users', (req, res) => {
   const user = req.body;
   if (user && user.uid) {
     store.users[user.uid] = { ...store.users[user.uid], ...user };
+    if (user.password && user.email) {
+      store.credentials[user.email.toLowerCase().trim()] = user.password;
+    }
     saveStore();
   }
   res.json({ success: true, user: store.users[user.uid] });

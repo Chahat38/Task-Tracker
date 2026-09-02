@@ -9,6 +9,8 @@ import { LoginView } from './components/LoginView';
 import { PendingApprovalView } from './components/PendingApprovalView';
 import { Navbar } from './components/Navbar';
 import { PersonalDashboard } from './components/PersonalDashboard';
+import { ExecutiveDashboard } from './components/ExecutiveDashboard';
+import { AdminOperationsDashboard } from './components/AdminOperationsDashboard';
 import { TeamProgressDashboard } from './components/TeamProgressDashboard';
 import { UserManagement } from './components/UserManagement';
 import { PendingApprovalsPage } from './components/PendingApprovalsPage';
@@ -119,8 +121,16 @@ function AppContent() {
         {currentTab === 'personal' && currentUser.role !== 'super_admin' && (
           <PersonalDashboard />
         )}
-        {currentTab === 'team' && (currentUser.role === 'admin' || currentUser.role === 'super_admin') && (
-          <TeamProgressDashboard />
+        {currentTab === 'team' && currentUser.role === 'super_admin' && (
+          <ExecutiveDashboard
+            onNavigateToUsers={() => handleTabChange('users')}
+            onNavigateToApprovals={() => handleTabChange('approvals')}
+          />
+        )}
+        {currentTab === 'team' && currentUser.role === 'admin' && (
+          <AdminOperationsDashboard
+            onNavigateToUsers={() => handleTabChange('users')}
+          />
         )}
         {currentTab === 'users' && (currentUser.role === 'admin' || currentUser.role === 'super_admin') && (
           <UserManagement />

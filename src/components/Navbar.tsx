@@ -56,20 +56,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Sidebar Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {/* Team Feed (Team Progress) */}
+          {/* Team Feed / Command Center */}
           {canViewTeam && (
             <button
               id="nav-tab-team"
               type="button"
               onClick={() => handleSelectTab('team')}
-              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
+              className={`w-full px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
                 currentTab === 'team'
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                  : 'text-slate-500 hover:bg-slate-50'
+                  ? isSuperAdmin
+                    ? 'bg-slate-900 text-white font-bold shadow-sm'
+                    : 'bg-blue-50 text-blue-800 font-bold border border-blue-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <LayoutDashboard className="w-5 h-5 shrink-0" />
-              <span>Real-time Feed</span>
+              <LayoutDashboard className={`w-4 h-4 shrink-0 ${isSuperAdmin && currentTab === 'team' ? 'text-indigo-400' : 'text-slate-500'}`} />
+              <span>{isSuperAdmin ? 'Command Center' : 'Operations & Reviews'}</span>
             </button>
           )}
 
@@ -79,14 +81,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="nav-tab-personal"
               type="button"
               onClick={() => handleSelectTab('personal')}
-              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
+              className={`w-full px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
                 currentTab === 'personal'
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                  : 'text-slate-500 hover:bg-slate-50'
+                  ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <FileText className="w-5 h-5 shrink-0" />
-              <span>My Progress</span>
+              <FileText className={`w-4 h-4 shrink-0 ${currentTab === 'personal' ? 'text-emerald-600' : 'text-slate-500'}`} />
+              <span>{isAdmin ? 'My Daily Log' : 'My Workspace'}</span>
             </button>
           )}
 
@@ -96,14 +98,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="nav-tab-users"
               type="button"
               onClick={() => handleSelectTab('users')}
-              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer relative ${
+              className={`w-full px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer relative ${
                 currentTab === 'users'
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                  : 'text-slate-500 hover:bg-slate-50'
+                  ? 'bg-indigo-50 text-indigo-800 font-bold border border-indigo-200/60'
+                  : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <Users className="w-5 h-5 shrink-0" />
-              <span>Team Management</span>
+              <Users className="w-4 h-4 shrink-0 text-slate-500" />
+              <span>{isSuperAdmin ? 'Personnel & Passwords' : 'Team Directory'}</span>
             </button>
           )}
 
