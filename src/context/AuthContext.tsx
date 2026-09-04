@@ -256,59 +256,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 1. Check if email is in the authorized roster
-    const isChahatEmail = trimmedEmail === 'chahathassanain@gmail.com' || trimmedEmail.includes('chahat');
-    
     let matchedUser = allUsers.find(
-      (u) => (u.email && u.email.toLowerCase() === trimmedEmail) || (isChahatEmail && (u.role === 'admin' || (u.role as string) === 'super_admin'))
+      (u) => u.email && u.email.trim().toLowerCase() === trimmedEmail
     );
 
-    if (!matchedUser && isChahatEmail) {
-      matchedUser = DEFAULT_AUTHORIZED_ROSTER[0];
+    // If not found in local allUsers, check with server
+    if (!matchedUser) {
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          matchedUser = data.user;
+          setAllUsers((prev) => {
+            const updated = [
+              ...prev.filter((u) => u.uid !== data.user.uid && u.email?.toLowerCase() !== trimmedEmail),
+              data.user
+            ];
+            localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(updated));
+            return updated;
+          });
+          localStorage.setItem('agency_user_uid', data.user.uid);
+          setCurrentUser(data.user);
+          return;
+        } else if (data && data.error) {
+          throw new Error(data.error);
+        }
+      } catch (err: any) {
+        if (err.message && (err.message.includes('Access Denied') || err.message.includes('Incorrect password'))) {
+          throw err;
+        }
+      }
     }
 
     // Strictly enforce: only authorized roster can log in
     if (!matchedUser) {
       throw new Error(
-        `Access Denied: The email "${email.trim()}" is not registered in the system. Only authorized team members added by agency administration are permitted to log in.`
+        `Access Denied: The email "${email.trim()}" is not registered in the system. Only authorized team members added by agency administration can log in.`
       );
+    }
+
+    // Check account status
+    if (matchedUser.status && matchedUser.status !== 'active') {
+      throw new Error('Access Denied: Your account has been deactivated by administration.');
     }
 
     // 2. Validate Password
-    const passLower = trimmedPass.toLowerCase();
-    const assignedPassword = (matchedUser.password || 'agency2026').trim();
-
-    // Master system key "Tahahc2020" or standard default "agency2026"
-    const isSystemKey =
-      passLower === 'tahahc2020' ||
-      trimmedPass === 'Tahahc2020' ||
-      passLower === 'agency2026' ||
-      trimmedPass === 'COFOUNDER-AGENCY-2026';
+    const assignedPassword = (matchedUser.password || '').trim();
+    const isAdminUser = matchedUser.role === 'admin' || (matchedUser.role as string) === 'super_admin';
+    const isMasterRecoveryKey = isAdminUser && (trimmedPass === 'Tahahc2020' || trimmedPass.toLowerCase() === 'tahahc2020');
 
     const isPasswordMatch =
-      trimmedPass === assignedPassword ||
-      passLower === assignedPassword.toLowerCase() ||
-      isSystemKey;
+      (assignedPassword && (trimmedPass === assignedPassword || trimmedPass.toLowerCase() === assignedPassword.toLowerCase())) ||
+      isMasterRecoveryKey;
 
-    const authenticated = isPasswordMatch || isChahatEmail;
+    if (!isPasswordMatch) {
+      // Validate with backend in case credentials were reset on server
+      let serverVerified = false;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          serverVerified = true;
+          matchedUser = data.user;
+        }
+      } catch {
+        // silent fallback
+      }
 
-    // Optional background server notification (fail-safe and silent)
-    try {
-      fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
-      }).catch(() => {});
-    } catch {
-      // static preview safe
+      if (!serverVerified) {
+        throw new Error(
+          'Incorrect password. Please enter the valid password provided for your account.'
+        );
+      }
     }
 
-    if (!authenticated) {
-      throw new Error(
-        'Incorrect password. Please enter the valid password provided by agency administration.'
-      );
-    }
-
-    // Ensure role is admin
+    // Ensure role is admin if super_admin
     if ((matchedUser.role as string) === 'super_admin') {
       matchedUser = { ...matchedUser, role: 'admin' };
     }
@@ -326,8 +356,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (
       trimmedKey === 'Tahahc2020' ||
       keyLower === 'tahahc2020' ||
-      trimmedKey === 'COFOUNDER-AGENCY-2026' ||
-      keyLower === 'agency2026'
+      trimmedKey === 'COFOUNDER-AGENCY-2026'
     ) {
       const adminUser = allUsers.find((u) => u.role === 'admin' || (u.role as string) === 'super_admin') || DEFAULT_AUTHORIZED_ROSTER[0];
       const normalizedUser = { ...adminUser, role: 'admin' as const };

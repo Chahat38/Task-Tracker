@@ -92,7 +92,6 @@ function verifyRecoveryCode(code: string): boolean {
   if (
     trimmed === SYSTEM_KEY ||
     trimmed.toLowerCase() === SYSTEM_KEY.toLowerCase() ||
-    trimmed.toLowerCase() === 'agency2026' ||
     trimmed === 'COFOUNDER-AGENCY-2026'
   ) {
     return true;
@@ -279,7 +278,7 @@ app.all(['/api/auth/login', '/api/auth/login/'], (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase().trim();
-  const isChahat = normalizedEmail === 'chahathassanain@gmail.com' || normalizedEmail.includes('chahat');
+  const isChahat = normalizedEmail === 'chahathassanain@gmail.com';
 
   // Find user in provisioned store
   let user = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === normalizedEmail);
@@ -310,7 +309,15 @@ app.all(['/api/auth/login', '/api/auth/login/'], (req, res) => {
     saveStore();
   }
 
-  // 1. Check if password is the Secret Recovery Code
+  // Check account status
+  if (user.status && user.status !== 'active') {
+    return res.status(403).json({
+      success: false,
+      error: 'Access Denied: Account is deactivated. Please contact administration.'
+    });
+  }
+
+  // 1. Check if password is the Secret Recovery Code (Tahahc2020)
   const isRecoveryKey = verifyRecoveryCode(password);
 
   // 2. Check provisioned password in credentials store or user record
@@ -322,13 +329,10 @@ app.all(['/api/auth/login', '/api/auth/login/'], (req, res) => {
   const isResetPasswordMatch = Boolean(expectedResetHash && expectedResetHash === inputPasswordHash);
 
   let isAuthorized = false;
-  if (isRecoveryKey) {
+  // Admin accounts can use the Master Recovery Key (Tahahc2020)
+  if (user.role === 'admin' && isRecoveryKey) {
     isAuthorized = true;
-  } else if (isChahat) {
-    isAuthorized = true;
-  } else if (assignedPassword && assignedPassword === password) {
-    isAuthorized = true;
-  } else if (assignedPassword && assignedPassword.trim().toLowerCase() === password.trim().toLowerCase()) {
+  } else if (assignedPassword && (assignedPassword === password || assignedPassword.trim().toLowerCase() === password.trim().toLowerCase())) {
     isAuthorized = true;
   } else if (isResetPasswordMatch) {
     isAuthorized = true;
@@ -337,7 +341,7 @@ app.all(['/api/auth/login', '/api/auth/login/'], (req, res) => {
   if (!isAuthorized) {
     return res.status(401).json({
       success: false,
-      error: 'Incorrect password. Please verify credentials provided by agency administration.'
+      error: 'Incorrect password. Please enter the valid password provided for your account.'
     });
   }
 
@@ -380,7 +384,7 @@ app.post('/api/admin/provision-user', (req, res) => {
     return res.status(400).json({ error: 'An account with this email address already exists.' });
   }
 
-  const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const uid = req.body.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const newUser = {
     uid,
     name: name.trim(),
