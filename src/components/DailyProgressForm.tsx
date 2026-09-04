@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProgressEntry, TaskItem, PendingTaskItem } from '../types';
 import { getTodayDateString } from '../utils/rules';
-import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { upsertProgressEntry } from '../utils/entriesStorage';
 import {
   Check,
   Calendar,
@@ -162,23 +161,7 @@ export const DailyProgressForm: React.FC<DailyProgressFormProps> = ({
     };
 
     try {
-      // 1. Save to Firestore
-      try {
-        await setDoc(doc(db, 'progress_entries', entryId), payload);
-      } catch (firestoreErr: any) {
-        console.warn('Firestore direct write notice:', firestoreErr.message);
-      }
-
-      // 2. Save to server persistent backup sync
-      const res = await fetch('/api/sync/entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        throw new Error('Server sync encountered an issue.');
-      }
+      await upsertProgressEntry(payload);
 
       setStatusMessage({
         type: 'success',

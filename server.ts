@@ -9,6 +9,17 @@ const PORT = 3000;
 
 app.use(express.json());
 
+// Enable full CORS and preflight handling
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Server-side persistent storage directory
 const DATA_DIR = path.join(process.cwd(), '.data');
 if (!fs.existsSync(DATA_DIR)) {
@@ -615,28 +626,33 @@ app.post('/api/sync/users', (req, res) => {
   res.json({ success: true, user: store.users[user.uid] });
 });
 
-app.get('/api/sync/entries', (req, res) => {
-  res.json({ entries: store.entries });
-});
-
-app.post('/api/sync/entries', (req, res) => {
-  const entry = req.body;
-  if (entry && entry.userId) {
-    const id = entry.id || `entry_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const newEntry = { ...entry, id };
-    // update existing if matches same user and date, or append
-    const existingIndex = store.entries.findIndex(
-      e => (e.id === newEntry.id) || (e.userId === newEntry.userId && e.date === newEntry.date)
-    );
-    if (existingIndex >= 0) {
-      store.entries[existingIndex] = newEntry;
-    } else {
-      store.entries.unshift(newEntry);
-    }
-    saveStore();
-    return res.json({ success: true, entry: newEntry });
+app.all(['/api/sync/entries', '/api/sync/entries/'], (req, res) => {
+  if (req.method === 'GET') {
+    return res.json({ entries: store.entries || [] });
   }
-  res.status(400).json({ error: 'Invalid entry payload' });
+
+  if (req.method === 'POST' || req.method === 'PUT') {
+    const entry = req.body;
+    if (entry && entry.userId) {
+      if (!store.entries) store.entries = [];
+      const id = entry.id || `entry_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const newEntry = { ...entry, id };
+      // update existing if matches same user and date, or append
+      const existingIndex = store.entries.findIndex(
+        e => (e.id === newEntry.id) || (e.userId === newEntry.userId && e.date === newEntry.date)
+      );
+      if (existingIndex >= 0) {
+        store.entries[existingIndex] = newEntry;
+      } else {
+        store.entries.unshift(newEntry);
+      }
+      saveStore();
+      return res.json({ success: true, entry: newEntry });
+    }
+    return res.status(400).json({ error: 'Invalid entry payload' });
+  }
+
+  return res.status(200).json({ success: true });
 });
 
 // ----------------------------------------------------

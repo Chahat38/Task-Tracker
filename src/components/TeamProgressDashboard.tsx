@@ -4,8 +4,7 @@ import { ProgressEntry, UserProfile } from '../types';
 import { RoleBadge } from './RoleBadge';
 import { Footer } from './Footer';
 import { formatDate, getTodayDateString, getInitials } from '../utils/rules';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { subscribeToEntries } from '../utils/entriesStorage';
 import {
   Search,
   Calendar,
@@ -49,56 +48,18 @@ export const TeamProgressDashboard: React.FC = () => {
     return `${y}-${m}-${day}`;
   }, []);
 
-  // Real-time listener on progress_entries collection
+  // Resilient multi-tier listener on progress_entries
   useEffect(() => {
-    let unsubscribeFirestore: (() => void) | undefined;
-
-    const fetchServerEntries = async () => {
-      try {
-        const res = await fetch('/api/sync/entries');
-        const data = await res.json();
-        if (data.entries) {
-          const sorted = [...data.entries].sort(
-            (a, b) => b.date.localeCompare(a.date) || (b.createdAt || '').localeCompare(a.createdAt || '')
-          );
-          setEntries(sorted);
-        }
-      } catch (err) {
-        // ignore
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    try {
-      const entriesCol = collection(db, 'progress_entries');
-      unsubscribeFirestore = onSnapshot(
-        entriesCol,
-        (snapshot) => {
-          const list: ProgressEntry[] = [];
-          snapshot.forEach((d) => {
-            list.push({ ...(d.data() as ProgressEntry), id: d.id });
-          });
-          list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-          setEntries(list);
-          setLoading(false);
-        },
-        async (err) => {
-          console.warn('Firestore subscription notice on entries:', err.message);
-          fetchServerEntries();
-        }
+    const unsubscribe = subscribeToEntries((all) => {
+      const sorted = [...all].sort(
+        (a, b) => b.date.localeCompare(a.date) || (b.createdAt || '').localeCompare(a.createdAt || '')
       );
-    } catch (e) {
-      console.warn('Firestore query error:', e);
-      fetchServerEntries();
-    }
-
-    fetchServerEntries();
-    const interval = setInterval(fetchServerEntries, 4000);
+      setEntries(sorted);
+      setLoading(false);
+    });
 
     return () => {
-      if (unsubscribeFirestore) unsubscribeFirestore();
-      clearInterval(interval);
+      unsubscribe();
     };
   }, []);
 

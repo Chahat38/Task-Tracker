@@ -6,8 +6,7 @@ import { PersonalAssignedTasks } from './PersonalAssignedTasks';
 import { Footer } from './Footer';
 import { RoleBadge } from './RoleBadge';
 import { formatDate, getTodayDateString } from '../utils/rules';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { subscribeToEntries } from '../utils/entriesStorage';
 import {
   Calendar,
   CheckCircle2,
@@ -31,59 +30,17 @@ export const PersonalDashboard: React.FC = () => {
 
   if (!currentUser) return null;
 
-  // Real-time Firestore sync for user's own progress entries
+  // Resilient multi-tier sync for user's progress entries
   useEffect(() => {
-    let unsubscribeFirestore: (() => void) | undefined;
-    let isServerAvailable = true;
-
-    const fetchServerEntries = async () => {
-      if (!isServerAvailable) return;
-      try {
-        const res = await fetch('/api/sync/entries');
-        if (!res.ok) {
-          isServerAvailable = false;
-          return;
-        }
-        const data = await res.json();
-        if (data.entries) {
-          const userEntries = data.entries.filter((e: ProgressEntry) => e.userId === currentUser.uid);
-          userEntries.sort((a: ProgressEntry, b: ProgressEntry) => b.date.localeCompare(a.date));
-          setEntries(userEntries);
-        }
-      } catch {
-        isServerAvailable = false;
-      } finally {
-        setLoadingEntries(false);
-      }
-    };
-
-    try {
-      const q = query(
-        collection(db, 'progress_entries'),
-        where('userId', '==', currentUser.uid)
-      );
-
-      unsubscribeFirestore = onSnapshot(
-        q,
-        (snapshot) => {
-          const list: ProgressEntry[] = [];
-          snapshot.forEach((d) => {
-            list.push({ ...(d.data() as ProgressEntry), id: d.id });
-          });
-          list.sort((a, b) => b.date.localeCompare(a.date));
-          setEntries(list);
-          setLoadingEntries(false);
-        },
-        () => fetchServerEntries()
-      );
-    } catch {
-      fetchServerEntries();
-    }
-
-    fetchServerEntries();
+    const unsubscribe = subscribeToEntries((all) => {
+      const userEntries = all.filter((e) => e.userId === currentUser.uid);
+      userEntries.sort((a, b) => b.date.localeCompare(a.date));
+      setEntries(userEntries);
+      setLoadingEntries(false);
+    });
 
     return () => {
-      if (unsubscribeFirestore) unsubscribeFirestore();
+      unsubscribe();
     };
   }, [currentUser.uid]);
 

@@ -4,8 +4,7 @@ import { ProgressEntry, UserProfile } from '../types';
 import { RoleBadge } from './RoleBadge';
 import { TaskAccountabilitySection } from './TaskAccountabilitySection';
 import { formatDate, getTodayDateString, getInitials } from '../utils/rules';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { subscribeToEntries } from '../utils/entriesStorage';
 import {
   Calendar,
   CheckCircle2,
@@ -55,52 +54,18 @@ export const AdminOperationsDashboard: React.FC<AdminOperationsDashboardProps> =
     return `${y}-${m}-${day}`;
   }, []);
 
-  // Fetch entries with circuit breaker
+  // Resilient multi-tier entries listener
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let isServerAvailable = true;
-
-    const fetchServerEntries = async () => {
-      if (!isServerAvailable) return;
-      try {
-        const res = await fetch('/api/sync/entries');
-        if (!res.ok) {
-          isServerAvailable = false;
-          return;
-        }
-        const data = await res.json();
-        if (data.entries) {
-          const sorted = [...data.entries].sort(
-            (a, b) => b.date.localeCompare(a.date) || (b.createdAt || '').localeCompare(a.createdAt || '')
-          );
-          setEntries(sorted);
-        }
-      } catch {
-        isServerAvailable = false;
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    try {
-      unsubscribe = onSnapshot(
-        collection(db, 'progress_entries'),
-        (snap) => {
-          const list: ProgressEntry[] = [];
-          snap.forEach((d) => list.push({ ...(d.data() as ProgressEntry), id: d.id }));
-          list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-          setEntries(list);
-          setLoading(false);
-        },
-        () => fetchServerEntries()
+    const unsubscribe = subscribeToEntries((all) => {
+      const sorted = [...all].sort(
+        (a, b) => b.date.localeCompare(a.date) || (b.createdAt || '').localeCompare(a.createdAt || '')
       );
-    } catch {
-      fetchServerEntries();
-    }
+      setEntries(sorted);
+      setLoading(false);
+    });
 
-    fetchServerEntries();
     return () => {
-      if (unsubscribe) unsubscribe();
+      unsubscribe();
     };
   }, []);
 
