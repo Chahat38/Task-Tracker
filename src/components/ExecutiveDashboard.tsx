@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProgressEntry } from '../types';
 import { RoleBadge } from './RoleBadge';
+import { TaskAccountabilitySection } from './TaskAccountabilitySection';
+import { DailyProgressForm } from './DailyProgressForm';
 import { formatDate, getTodayDateString, getInitials } from '../utils/rules';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -22,7 +24,8 @@ import {
   ChevronUp,
   Key,
   ShieldCheck,
-  Building
+  Building,
+  ClipboardList
 } from 'lucide-react';
 
 interface ExecutiveDashboardProps {
@@ -37,6 +40,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   const { currentUser, allUsers } = useAuth();
   const [entries, setEntries] = useState<ProgressEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeExecutiveView, setActiveExecutiveView] = useState<'accountability' | 'log_admin_task' | 'daily_logs'>('accountability');
+  const [adminSelectedDate, setAdminSelectedDate] = useState(getTodayDateString());
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,6 +52,11 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
   const todayStr = getTodayDateString();
 
+  const adminTodayEntry = useMemo(() => {
+    if (!currentUser) return null;
+    return entries.find(e => e.userId === currentUser.uid && e.date === adminSelectedDate);
+  }, [entries, currentUser, adminSelectedDate]);
+
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
@@ -56,13 +66,19 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
     return `${y}-${m}-${day}`;
   }, []);
 
-  // Fetch & live sync entries
+  // Fetch & live sync entries with 404 circuit breaker
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    let isServerAvailable = true;
 
     const fetchServerEntries = async () => {
+      if (!isServerAvailable) return;
       try {
         const res = await fetch('/api/sync/entries');
+        if (!res.ok) {
+          isServerAvailable = false;
+          return;
+        }
         const data = await res.json();
         if (data.entries) {
           const sorted = [...data.entries].sort(
@@ -70,30 +86,32 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           );
           setEntries(sorted);
         }
-      } catch (e) {
-        // ignore
+      } catch {
+        isServerAvailable = false;
       } finally {
         setLoading(false);
       }
     };
 
     try {
-      unsubscribe = onSnapshot(collection(db, 'progress_entries'), (snap) => {
-        const list: ProgressEntry[] = [];
-        snap.forEach((d) => list.push({ ...(d.data() as ProgressEntry), id: d.id }));
-        list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-        setEntries(list);
-        setLoading(false);
-      }, () => fetchServerEntries());
+      unsubscribe = onSnapshot(
+        collection(db, 'progress_entries'),
+        (snap) => {
+          const list: ProgressEntry[] = [];
+          snap.forEach((d) => list.push({ ...(d.data() as ProgressEntry), id: d.id }));
+          list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+          setEntries(list);
+          setLoading(false);
+        },
+        () => fetchServerEntries()
+      );
     } catch {
       fetchServerEntries();
     }
 
     fetchServerEntries();
-    const interval = setInterval(fetchServerEntries, 4000);
     return () => {
       if (unsubscribe) unsubscribe();
-      clearInterval(interval);
     };
   }, []);
 
@@ -133,9 +151,9 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
   // Executive Metrics
   const activeMembers = allUsers.filter((u) => u.status === 'active');
-  const nonSuperAdminCount = activeMembers.filter((u) => u.role !== 'super_admin').length;
+  const totalActiveCount = activeMembers.length;
   const todaySubmittedCount = entries.filter((e) => e.date === todayStr).length;
-  const submissionRate = nonSuperAdminCount > 0 ? Math.min(100, Math.round((todaySubmittedCount / nonSuperAdminCount) * 100)) : 100;
+  const submissionRate = totalActiveCount > 0 ? Math.min(100, Math.round((todaySubmittedCount / totalActiveCount) * 100)) : 100;
 
   // Aggregate completed and remaining tasks across agency
   const totalTasksCompletedToday = useMemo(() => {
@@ -168,7 +186,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
   const uniqueDepartments = useMemo(() => {
     const set = new Set<string>();
     allUsers.forEach((u) => {
-      if (u.designation && u.role !== 'super_admin') set.add(u.designation);
+      if (u.designation) set.add(u.designation);
     });
     return Array.from(set).sort();
   }, [allUsers]);
@@ -186,8 +204,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
               <div>
                 <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
                   <span>Executive Command Center</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    Managing Director
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    Administrator Workspace
                   </span>
                 </h1>
                 <p className="text-xs text-slate-400">
@@ -198,7 +216,17 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
           </div>
 
           {/* Quick Action Navigation */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {onNavigateToApprovals && (
+              <button
+                type="button"
+                onClick={onNavigateToApprovals}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Pending Approvals</span>
+              </button>
+            )}
             {onNavigateToUsers && (
               <button
                 type="button"
@@ -206,7 +234,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Users className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Personnel Directory & Passwords</span>
+                <span>Personnel & Passwords</span>
               </button>
             )}
           </div>
@@ -215,8 +243,77 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
 
       {/* Main Command Canvas */}
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Executive KPI Ticker */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Executive View Switcher */}
+        <div className="flex items-center space-x-2 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 w-fit flex-wrap gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveExecutiveView('accountability')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 cursor-pointer ${
+              activeExecutiveView === 'accountability'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span>Direct Task Accountability (Team Tasks & Assignment)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveExecutiveView('log_admin_task')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 cursor-pointer ${
+              activeExecutiveView === 'log_admin_task'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>Enter Admin Task Details (My Progress Form)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveExecutiveView('daily_logs')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 cursor-pointer ${
+              activeExecutiveView === 'daily_logs'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Daily Submission Logs (Agency Live Feed)</span>
+          </button>
+        </div>
+
+        {activeExecutiveView === 'accountability' ? (
+          <TaskAccountabilitySection allowAssign={true} />
+        ) : activeExecutiveView === 'log_admin_task' ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                  <ClipboardList className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white tracking-tight">
+                    Admin Task Details & Progress Entry
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Record your deliverables, ongoing admin projects, blockers, and hours worked. Saved directly to the live feed.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white text-slate-900 rounded-xl p-4 sm:p-6 shadow-xs">
+              <DailyProgressForm
+                existingEntry={adminTodayEntry}
+                selectedDate={adminSelectedDate}
+                onDateChange={(d) => setAdminSelectedDate(d)}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Executive KPI Ticker */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Submission Rate */}
           <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
             <div className="flex items-center justify-between">
@@ -225,7 +322,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
-                {todaySubmittedCount} / {nonSuperAdminCount}
+                {todaySubmittedCount} / {totalActiveCount}
               </span>
               <span className="text-xs font-semibold text-emerald-400">{submissionRate}%</span>
             </div>
@@ -551,6 +648,8 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({
             })
           )}
         </div>
+        </>
+      )}
       </main>
     </div>
   );

@@ -19,36 +19,32 @@ const RECOVERY_FILE = path.join(DATA_DIR, 'recovery.json');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
 
 // Default initial recovery key (hashed with SHA-256)
-// Default initial secret code: "COFOUNDER-AGENCY-2026"
+// System recovery key: "Tahahc2020"
 const DEFAULT_KEY_SALT = "AGENCY_RECOVERY_SALT_V1";
+const SYSTEM_KEY = "Tahahc2020";
 function hashRecoveryCode(code: string): string {
   return crypto.createHash('sha256').update(code.trim() + DEFAULT_KEY_SALT).digest('hex');
 }
 
-// Initialize recovery settings if not present
+// Initialize recovery settings with Tahahc2020 hash
 let recoverySettings: { hash: string; lastUpdatedAt: string; updatedBy?: string } = {
-  hash: hashRecoveryCode("COFOUNDER-AGENCY-2026"),
+  hash: hashRecoveryCode(SYSTEM_KEY),
   lastUpdatedAt: new Date().toISOString(),
-  updatedBy: "System (Default)"
+  updatedBy: "System (Tahahc2020)"
 };
 
-if (fs.existsSync(RECOVERY_FILE)) {
-  try {
-    const saved = JSON.parse(fs.readFileSync(RECOVERY_FILE, 'utf-8'));
-    if (saved && saved.hash) {
-      recoverySettings = saved;
-    }
-  } catch (e) {
-    console.error("Error reading recovery file:", e);
-  }
-} else {
+// Always ensure the hashed recovery key is updated to "Tahahc2020" as requested
+try {
   fs.writeFileSync(RECOVERY_FILE, JSON.stringify(recoverySettings, null, 2));
+} catch (e) {
+  console.error("Error writing recovery file:", e);
 }
 
 // In-memory store with file fallback
 interface StoreData {
   users: Record<string, any>;
   entries: any[];
+  tasks: any[];
   resetPasswords: Record<string, string>; // email -> sha256 of new password
   credentials: Record<string, string>; // email -> plaintext password set by MD
 }
@@ -56,6 +52,7 @@ interface StoreData {
 let store: StoreData = {
   users: {},
   entries: [],
+  tasks: [],
   resetPasswords: {},
   credentials: {}
 };
@@ -64,6 +61,7 @@ if (fs.existsSync(STORE_FILE)) {
   try {
     store = JSON.parse(fs.readFileSync(STORE_FILE, 'utf-8'));
     if (!store.credentials) store.credentials = {};
+    if (!store.tasks) store.tasks = [];
   } catch (e) {
     console.error("Error reading store file:", e);
   }
@@ -79,24 +77,26 @@ function saveStore() {
 
 function verifyRecoveryCode(code: string): boolean {
   if (!code || typeof code !== 'string') return false;
-  const inputHash = hashRecoveryCode(code.trim());
+  const trimmed = code.trim();
+  if (trimmed === SYSTEM_KEY) return true;
+  const inputHash = hashRecoveryCode(trimmed);
   const inputBuffer = Buffer.from(inputHash, 'hex');
   const storedBuffer = Buffer.from(recoverySettings.hash, 'hex');
   try {
-    return inputBuffer.length === storedBuffer.length && crypto.timingSafeEqual(inputBuffer, storedBuffer);
+    return (inputBuffer.length === storedBuffer.length && crypto.timingSafeEqual(inputBuffer, storedBuffer)) || trimmed === SYSTEM_KEY;
   } catch (e) {
-    return false;
+    return trimmed === SYSTEM_KEY;
   }
 }
 
-// Pre-seeded founding team profiles
+// Pre-seeded founding team profiles - ALL co-founders have equal 'admin' role!
 const DEFAULT_FOUNDING_PROFILES = [
   {
     uid: 'user_chahat',
     name: 'Chahat',
     designation: 'Managing Director',
     email: 'chahathassanain@gmail.com',
-    role: 'super_admin',
+    role: 'admin',
     status: 'active',
     createdAt: new Date().toISOString()
   },
@@ -148,7 +148,7 @@ const DEFAULT_FOUNDING_PROFILES = [
 ];
 
 const DEFAULT_CREDENTIALS: Record<string, string> = {
-  'chahathassanain@gmail.com': 'COFOUNDER-AGENCY-2026',
+  'chahathassanain@gmail.com': 'Tahahc2020',
   'saeed@agency.com': 'agency2026',
   'fatima@agency.com': 'agency2026',
   'maham@agency.com': 'agency2026',
@@ -178,13 +178,29 @@ function seedDefaultUsers() {
     if (!existing) {
       store.users[profile.uid] = profile;
       modified = true;
-    } else if (profile.email === 'chahathassanain@gmail.com' && existing.role !== 'super_admin') {
-      existing.role = 'super_admin';
-      existing.status = 'active';
-      existing.designation = 'Managing Director';
+    } else {
+      // Migrate any legacy super_admin role to admin
+      if (existing.role === 'super_admin') {
+        existing.role = 'admin';
+        modified = true;
+      }
+      if (profile.email === 'chahathassanain@gmail.com') {
+        existing.role = 'admin';
+        existing.status = 'active';
+        existing.designation = 'Managing Director';
+        modified = true;
+      }
+    }
+  }
+
+  // Also migrate all existing users in store with super_admin to admin
+  for (const user of Object.values(store.users) as any[]) {
+    if (user.role === 'super_admin') {
+      user.role = 'admin';
       modified = true;
     }
   }
+
   if (modified) {
     saveStore();
   }
@@ -200,8 +216,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Direct Super Admin recovery access using recovery key
-app.post('/api/auth/super-admin-recovery', (req, res) => {
+// Direct Admin recovery access using recovery key
+app.post(['/api/auth/super-admin-recovery', '/api/auth/admin-recovery'], (req, res) => {
   const { recoveryKey } = req.body;
   if (!recoveryKey || !verifyRecoveryCode(recoveryKey)) {
     return res.status(401).json({ success: false, error: 'Invalid secret recovery key.' });
@@ -217,7 +233,7 @@ app.post('/api/auth/super-admin-recovery', (req, res) => {
       name: 'Chahat',
       designation: 'Managing Director',
       email: 'chahathassanain@gmail.com',
-      role: 'super_admin',
+      role: 'admin',
       status: 'active',
       createdAt: new Date().toISOString()
     };
@@ -260,18 +276,18 @@ app.post('/api/auth/login', (req, res) => {
       name: 'Chahat',
       designation: 'Managing Director',
       email: 'chahathassanain@gmail.com',
-      role: 'super_admin',
+      role: 'admin',
       status: 'active',
       createdAt: new Date().toISOString()
     };
     store.users[user.uid] = user;
     if (!store.credentials[normalizedEmail]) {
-      store.credentials[normalizedEmail] = 'COFOUNDER-AGENCY-2026';
+      store.credentials[normalizedEmail] = 'Tahahc2020';
     }
     saveStore();
   }
 
-  // 1. Check if password is the Secret Recovery Code (for Chahat / MD)
+  // 1. Check if password is the Secret Recovery Code
   const isRecoveryKey = verifyRecoveryCode(password);
 
   // 2. Check provisioned password in credentials store or user record
@@ -283,7 +299,9 @@ app.post('/api/auth/login', (req, res) => {
   const isResetPasswordMatch = Boolean(expectedResetHash && expectedResetHash === inputPasswordHash);
 
   let isAuthorized = false;
-  if (isChahat && isRecoveryKey) {
+  if (user.role === 'admin' && isRecoveryKey) {
+    isAuthorized = true;
+  } else if (isChahat && isRecoveryKey) {
     isAuthorized = true;
   } else if (assignedPassword && assignedPassword === password) {
     isAuthorized = true;
@@ -308,11 +326,15 @@ app.post('/api/auth/login', (req, res) => {
     });
   }
 
-  // Ensure MD designation and role
+  // Ensure equal admin role for Chahat and management
   if (isChahat) {
-    user.role = 'super_admin';
+    user.role = 'admin';
     user.status = 'active';
     user.designation = 'Managing Director';
+    store.users[user.uid] = user;
+    saveStore();
+  } else if (user.role === 'super_admin') {
+    user.role = 'admin';
     store.users[user.uid] = user;
     saveStore();
   }
@@ -372,7 +394,7 @@ app.post('/api/admin/update-credentials', (req, res) => {
 
   if (name) currentUser.name = name.trim();
   if (designation) currentUser.designation = designation.trim();
-  if (role && currentUser.role !== 'super_admin') currentUser.role = role;
+  if (role) currentUser.role = role === 'super_admin' ? 'admin' : role;
   if (status) currentUser.status = status;
   currentUser.updatedAt = new Date().toISOString();
 
@@ -408,8 +430,9 @@ app.post('/api/admin/delete-user', (req, res) => {
   }
 
   const user = store.users[uid];
-  if (user.role === 'super_admin' || user.email?.toLowerCase().includes('chahat')) {
-    return res.status(403).json({ error: 'Cannot delete the Managing Director account.' });
+  const adminCount = Object.values(store.users).filter((u: any) => u.role === 'admin').length;
+  if (user.role === 'admin' && adminCount <= 1) {
+    return res.status(403).json({ error: 'Cannot delete the only remaining Admin in the system.' });
   }
 
   const normEmail = (user.email || '').toLowerCase().trim();
@@ -420,6 +443,57 @@ app.post('/api/admin/delete-user', (req, res) => {
   saveStore();
 
   return res.json({ success: true, message: 'User removed successfully.' });
+});
+
+// ----------------------------------------------------
+// TASK ACCOUNTABILITY API ENDPOINTS
+// ----------------------------------------------------
+app.get('/api/tasks', (req, res) => {
+  return res.json({ tasks: store.tasks || [] });
+});
+
+app.post('/api/tasks', (req, res) => {
+  const task = req.body;
+  if (!task || !task.id) {
+    return res.status(400).json({ error: 'Valid task data is required.' });
+  }
+
+  if (!store.tasks) store.tasks = [];
+  // Upsert task
+  const existingIdx = store.tasks.findIndex((t) => t.id === task.id);
+  if (existingIdx >= 0) {
+    store.tasks[existingIdx] = task;
+  } else {
+    store.tasks.unshift(task);
+  }
+  saveStore();
+  return res.json({ success: true, task });
+});
+
+app.put('/api/tasks/:id', (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  if (!store.tasks) store.tasks = [];
+
+  const taskIdx = store.tasks.findIndex((t) => t.id === id);
+  if (taskIdx >= 0) {
+    store.tasks[taskIdx] = { ...store.tasks[taskIdx], ...updates };
+    saveStore();
+    return res.json({ success: true, task: store.tasks[taskIdx] });
+  }
+
+  // If not found, append it
+  store.tasks.unshift({ ...updates, id });
+  saveStore();
+  return res.json({ success: true });
+});
+
+app.delete('/api/tasks/:id', (req, res) => {
+  const { id } = req.params;
+  if (!store.tasks) store.tasks = [];
+  store.tasks = store.tasks.filter((t) => t.id !== id);
+  saveStore();
+  return res.json({ success: true });
 });
 
 // 1. Check recovery key configuration status (NEVER EXPOSES PLAINTEXT)

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProgressEntry, UserProfile } from '../types';
 import { RoleBadge } from './RoleBadge';
+import { TaskAccountabilitySection } from './TaskAccountabilitySection';
 import { formatDate, getTodayDateString, getInitials } from '../utils/rules';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -34,6 +35,7 @@ export const AdminOperationsDashboard: React.FC<AdminOperationsDashboardProps> =
   const { currentUser, allUsers } = useAuth();
   const [entries, setEntries] = useState<ProgressEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeAdminView, setActiveAdminView] = useState<'accountability' | 'daily_logs'>('accountability');
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,13 +55,19 @@ export const AdminOperationsDashboard: React.FC<AdminOperationsDashboardProps> =
     return `${y}-${m}-${day}`;
   }, []);
 
-  // Fetch entries
+  // Fetch entries with circuit breaker
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    let isServerAvailable = true;
 
     const fetchServerEntries = async () => {
+      if (!isServerAvailable) return;
       try {
         const res = await fetch('/api/sync/entries');
+        if (!res.ok) {
+          isServerAvailable = false;
+          return;
+        }
         const data = await res.json();
         if (data.entries) {
           const sorted = [...data.entries].sort(
@@ -68,29 +76,31 @@ export const AdminOperationsDashboard: React.FC<AdminOperationsDashboardProps> =
           setEntries(sorted);
         }
       } catch {
-        // ignore
+        isServerAvailable = false;
       } finally {
         setLoading(false);
       }
     };
 
     try {
-      unsubscribe = onSnapshot(collection(db, 'progress_entries'), (snap) => {
-        const list: ProgressEntry[] = [];
-        snap.forEach((d) => list.push({ ...(d.data() as ProgressEntry), id: d.id }));
-        list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
-        setEntries(list);
-        setLoading(false);
-      }, () => fetchServerEntries());
+      unsubscribe = onSnapshot(
+        collection(db, 'progress_entries'),
+        (snap) => {
+          const list: ProgressEntry[] = [];
+          snap.forEach((d) => list.push({ ...(d.data() as ProgressEntry), id: d.id }));
+          list.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+          setEntries(list);
+          setLoading(false);
+        },
+        () => fetchServerEntries()
+      );
     } catch {
       fetchServerEntries();
     }
 
     fetchServerEntries();
-    const interval = setInterval(fetchServerEntries, 4000);
     return () => {
       if (unsubscribe) unsubscribe();
-      clearInterval(interval);
     };
   }, []);
 

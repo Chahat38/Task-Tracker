@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'admin' | 'member' | 'intern';
+export type UserRole = 'admin' | 'member' | 'intern' | 'super_admin';
 export type UserStatus = 'pending' | 'active' | 'rejected';
 
 export interface TaskItem {
@@ -62,4 +62,30 @@ export interface RecoverySettings {
   lastUpdatedAt?: string;
   updatedBy?: string;
 }
+
+export interface AssignedTask {
+  id: string;
+  title: string;
+  description: string;
+  assignedToUid: string;
+  assignedToName: string;
+  assignedToDesignation: string;
+  assignedByUid: string;
+  assignedByName: string;
+  assignedByRole: string;
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string; // YYYY-MM-DD
+  status: 'pending' | 'in_progress' | 'completed' | 'blocked';
+  completedAt?: string;
+  completionNotes?: string; // Member's work detail / notes
+  workProofUrl?: string; // Link/proof of work
+  blockerReason?: string; // Explanation if blocked
+  isApprovedByMD?: boolean;
+  isApprovedByAdmin?: boolean;
+  mdFeedback?: string;
+  adminFeedback?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 

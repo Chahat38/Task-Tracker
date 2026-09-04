@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { TaskProvider } from './context/TaskContext';
 import { LoginView } from './components/LoginView';
 import { PendingApprovalView } from './components/PendingApprovalView';
 import { Navbar } from './components/Navbar';
@@ -118,24 +119,19 @@ function AppContent() {
       />
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto bg-[#F8FAFC]">
-        {currentTab === 'personal' && currentUser.role !== 'super_admin' && (
+        {currentTab === 'personal' && (
           <PersonalDashboard />
         )}
-        {currentTab === 'team' && currentUser.role === 'super_admin' && (
+        {currentTab === 'team' && (currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin') && (
           <ExecutiveDashboard
             onNavigateToUsers={() => handleTabChange('users')}
             onNavigateToApprovals={() => handleTabChange('approvals')}
           />
         )}
-        {currentTab === 'team' && currentUser.role === 'admin' && (
-          <AdminOperationsDashboard
-            onNavigateToUsers={() => handleTabChange('users')}
-          />
-        )}
-        {currentTab === 'users' && (currentUser.role === 'admin' || currentUser.role === 'super_admin') && (
+        {currentTab === 'users' && (currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin') && (
           <UserManagement />
         )}
-        {currentTab === 'approvals' && currentUser.role === 'super_admin' && (
+        {currentTab === 'approvals' && (currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin') && (
           <PendingApprovalsPage onRedirectToTeam={() => handleTabChange('team')} />
         )}
       </div>
@@ -146,7 +142,9 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <TaskProvider>
+        <AppContent />
+      </TaskProvider>
     </AuthProvider>
   );
 }

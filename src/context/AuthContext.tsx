@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -12,6 +12,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   collection,
   onSnapshot,
 } from 'firebase/firestore';
@@ -32,20 +33,120 @@ interface AuthContextType {
   updateUserProfile: (uid: string, updates: Partial<UserProfile>) => Promise<void>;
   allUsers: UserProfile[];
   refreshUsers: () => Promise<void>;
+  provisionUserDirect: (user: Partial<UserProfile> & { password?: string }) => Promise<void>;
+  deleteUserDirect: (uid: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const LOCAL_ROSTER_KEY = 'agency_authorized_roster_v3';
+
+// Default authorized roster - all co-founders have equal 'admin' role!
+export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
+  {
+    uid: 'user_chahat',
+    name: 'Chahat',
+    designation: 'Managing Director',
+    email: 'chahathassanain@gmail.com',
+    role: 'admin',
+    status: 'active',
+    password: 'Tahahc2020',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_saeed',
+    name: 'M. Saeed',
+    designation: 'CEO',
+    email: 'saeed@agency.com',
+    role: 'admin',
+    status: 'active',
+    password: 'agency2026',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_fatima',
+    name: 'Fatima Huma',
+    designation: 'COO',
+    email: 'fatima@agency.com',
+    role: 'admin',
+    status: 'active',
+    password: 'agency2026',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_maham',
+    name: 'Maham Noor',
+    designation: 'Content Creator Head',
+    email: 'maham@agency.com',
+    role: 'member',
+    status: 'active',
+    password: 'agency2026',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_remsha',
+    name: 'Remsha',
+    designation: 'Social Media Head',
+    email: 'remsha@agency.com',
+    role: 'member',
+    status: 'active',
+    password: 'agency2026',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_shawal',
+    name: 'Shawal',
+    designation: 'Graphic Designer',
+    email: 'shawal@agency.com',
+    role: 'member',
+    status: 'active',
+    password: 'agency2026',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  }
+];
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_ROSTER_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with defaults and migrate any super_admin to admin
+          const map = new Map<string, UserProfile>();
+          DEFAULT_AUTHORIZED_ROSTER.forEach((u) => map.set(u.uid, u));
+          parsed.forEach((u: UserProfile) => {
+            const role = (u.role as string) === 'super_admin' ? 'admin' : u.role;
+            map.set(u.uid, { ...u, role });
+          });
+          return Array.from(map.values());
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_AUTHORIZED_ROSTER;
+  });
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync all users for admins / super admins in real time
+  // Sync users to LocalStorage
+  const persistRoster = useCallback((roster: UserProfile[]) => {
+    setAllUsers(roster);
+    try {
+      localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(roster));
+    } catch (e) {
+      console.warn('Failed to save roster to localStorage:', e);
+    }
+  }, []);
+
+  // Sync users from Firestore and server (with 404 circuit breaker)
   useEffect(() => {
     let unsubscribeFirestore: (() => void) | undefined;
+    let isServerAvailable = true;
 
     try {
       const usersCol = collection(db, 'users');
@@ -57,326 +158,354 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             loaded.push({ ...(d.data() as UserProfile), uid: d.id });
           });
           if (loaded.length > 0) {
-            setAllUsers(loaded);
+            setAllUsers((prev) => {
+              const map = new Map<string, UserProfile>();
+              prev.forEach((u) => map.set(u.uid, u));
+              loaded.forEach((u) => map.set(u.uid, u));
+              const merged = Array.from(map.values());
+              localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
+              return merged;
+            });
           }
         },
-        async (err) => {
-          console.warn('Firestore users subscription notice:', err.message);
-          // Fallback to server sync endpoint
-          try {
-            const res = await fetch('/api/sync/users');
-            const data = await res.json();
-            if (data.users && data.users.length > 0) {
-              setAllUsers(data.users);
-            }
-          } catch (e) {
-            // silent
-          }
+        (err) => {
+          console.debug('Firestore users sync notice:', err.message);
         }
       );
-    } catch (e) {
-      console.warn('Firestore onSnapshot init:', e);
+    } catch {
+      // fallback
     }
 
-    // Also poll server backup sync periodically for real-time consistency
-    const pollInterval = setInterval(async () => {
+    // Single probe check for server sync to avoid spamming 404 errors if static Vercel
+    const checkServerSync = async () => {
+      if (!isServerAvailable) return;
       try {
         const res = await fetch('/api/sync/users');
+        if (!res.ok) {
+          // Server returned 404 or non-200, disable polling
+          isServerAvailable = false;
+          return;
+        }
         const data = await res.json();
         if (data.users && data.users.length > 0) {
           setAllUsers((prev) => {
-            const mergedMap = new Map<string, UserProfile>();
-            prev.forEach((u) => mergedMap.set(u.uid, u));
-            data.users.forEach((u: UserProfile) => mergedMap.set(u.uid, u));
-            return Array.from(mergedMap.values());
+            const map = new Map<string, UserProfile>();
+            prev.forEach((u) => map.set(u.uid, u));
+            data.users.forEach((u: UserProfile) => map.set(u.uid, u));
+            const merged = Array.from(map.values());
+            localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
+            return merged;
           });
         }
-      } catch (e) {
-        // silent
+      } catch {
+        isServerAvailable = false;
       }
-    }, 4000);
+    };
+
+    checkServerSync();
 
     return () => {
       if (unsubscribeFirestore) unsubscribeFirestore();
-      clearInterval(pollInterval);
     };
   }, []);
 
-  // Listen to Auth State
+  // Listen to local session and Firebase auth state
   useEffect(() => {
+    const storedUid = localStorage.getItem('agency_user_uid');
+
+    if (storedUid) {
+      const found = allUsers.find((u) => u.uid === storedUid);
+      if (found) {
+        setCurrentUser(found);
+      } else if (storedUid === 'user_chahat') {
+        const chahat = DEFAULT_AUTHORIZED_ROSTER[0];
+        setCurrentUser(chahat);
+      }
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
-      if (fbUser) {
-        await loadUserProfile(fbUser.uid, fbUser.email || '');
-      } else {
-        // Check if there is a local session from recovery reset login
-        const storedUid = localStorage.getItem('agency_user_uid');
-        if (storedUid) {
-          await loadUserProfile(storedUid, '');
-        } else {
-          setCurrentUser(null);
+      if (fbUser && fbUser.email) {
+        const userEmail = fbUser.email.toLowerCase();
+        const found = allUsers.find((u) => u.email?.toLowerCase() === userEmail);
+        if (found) {
+          localStorage.setItem('agency_user_uid', found.uid);
+          setCurrentUser(found);
         }
       }
       setLoading(false);
     });
 
+    setLoading(false);
     return () => unsubscribe();
-  }, []);
+  }, [allUsers]);
 
-  // Load user profile from Firestore with local / server fallback
-  const loadUserProfile = async (uid: string, email: string) => {
-    try {
-      const isChahat = (email && email.toLowerCase().includes('chahat')) || uid === 'user_chahat';
-
-      // 1. Try Firestore
-      try {
-        const userDocRef = doc(db, 'users', uid);
-        const snap = await getDoc(userDocRef);
-
-        if (snap.exists()) {
-          let data = snap.data() as UserProfile;
-          if (isChahat) {
-            data = {
-              ...data,
-              name: 'Chahat',
-              designation: 'Managing Director',
-              role: 'super_admin',
-              status: 'active'
-            };
-          }
-          setCurrentUser({ ...data, uid });
-          return;
-        }
-      } catch (firestoreErr) {
-        console.warn('Firestore profile lookup notice (using server sync):', firestoreErr);
-      }
-
-      // 2. Check server sync
-      const res = await fetch('/api/sync/users');
-      const data = await res.json();
-      let found = (data.users || []).find(
-        (u: UserProfile) =>
-          u.uid === uid ||
-          (email && u.email?.toLowerCase() === email.toLowerCase()) ||
-          (isChahat && (u.role === 'super_admin' || u.email?.toLowerCase().includes('chahat')))
-      );
-
-      if (found) {
-        if (isChahat) {
-          found = {
-            ...found,
-            name: 'Chahat',
-            designation: 'Managing Director',
-            role: 'super_admin',
-            status: 'active'
-          };
-        }
-        setCurrentUser(found);
-        return;
-      }
-
-      // If user is Chahat, auto-assign super_admin & active
-      const newProfile: UserProfile = {
-        uid: isChahat ? 'user_chahat' : uid,
-        name: isChahat ? 'Chahat' : (email ? email.split('@')[0] : 'Team Member'),
-        designation: isChahat ? 'Managing Director' : 'Team Member',
-        email: email || (isChahat ? 'chahathassanain@gmail.com' : ''),
-        role: isChahat ? 'super_admin' : 'member',
-        status: isChahat ? 'active' : 'pending',
-        createdAt: new Date().toISOString()
-      };
-
-      try {
-        await setDoc(doc(db, 'users', newProfile.uid), newProfile);
-      } catch (err) {
-        console.warn('Writing user profile to firestore:', err);
-      }
-
-      // Sync with server
-      await fetch('/api/sync/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProfile)
-      });
-
-      setCurrentUser(newProfile);
-    } catch (err: any) {
-      console.warn('Error loading user profile:', err.message);
-    }
-  };
-
+  // Strict Login Function: ONLY authorized roster can log in!
   const login = async (email: string, pass: string) => {
     setError(null);
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
     const trimmedPass = pass.trim();
 
-    // 1. First try Firebase Auth sign in
-    try {
-      const cred = await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPass);
-      await loadUserProfile(cred.user.uid, cred.user.email || trimmedEmail);
-      return;
-    } catch (fbErr: any) {
-      console.warn('Firebase login notice:', fbErr?.code || fbErr?.message);
+    if (!trimmedEmail || !trimmedPass) {
+      throw new Error('Please provide both email address and password.');
     }
 
-    // 2. Try server-side fallback authentication
-    // Supports:
-    // - Secret Recovery Key entered directly as password
-    // - Password reset performed via Secret Recovery Key
-    // - Pre-seeded team profiles
-    try {
-      const serverAuthRes = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
-      });
-      const serverAuthData = await serverAuthRes.json();
-      if (serverAuthRes.ok && serverAuthData.success && serverAuthData.user) {
-        localStorage.setItem('agency_user_uid', serverAuthData.user.uid);
-        setCurrentUser(serverAuthData.user);
-        return;
-      }
-      if (serverAuthData.error) {
-        throw new Error(serverAuthData.error);
-      }
-    } catch (serverErr: any) {
-      if (serverErr.message && !serverErr.message.includes('fetch')) {
-        throw serverErr;
-      }
-    }
-
-    throw new Error(
-      'Login failed. For Managing Director access, you can enter your email with the Master Recovery Key (COFOUNDER-AGENCY-2026) as your password, or use the Instant Access button.'
+    // 1. Check if email is in the authorized roster
+    const isChahatEmail = trimmedEmail === 'chahathassanain@gmail.com' || trimmedEmail.includes('chahat');
+    
+    let matchedUser = allUsers.find(
+      (u) => (u.email && u.email.toLowerCase() === trimmedEmail) || (isChahatEmail && (u.role === 'admin' || (u.role as string) === 'super_admin'))
     );
+
+    if (!matchedUser && isChahatEmail) {
+      matchedUser = DEFAULT_AUTHORIZED_ROSTER[0];
+    }
+
+    // Strictly enforce: only authorized roster can log in
+    if (!matchedUser) {
+      throw new Error(
+        `Access Denied: The email "${email.trim()}" is not registered in the system. Only authorized team members added by agency administration are permitted to log in.`
+      );
+    }
+
+    // 2. Validate Password
+    const assignedPassword = matchedUser.password || 'agency2026';
+    const isMasterKey = trimmedPass === 'Tahahc2020' || trimmedPass === 'COFOUNDER-AGENCY-2026' || trimmedPass.toLowerCase() === 'agency2026';
+    const isPasswordMatch = trimmedPass === assignedPassword;
+
+    let authenticated = isPasswordMatch || ((matchedUser.role === 'admin' || (matchedUser.role as string) === 'super_admin') && isMasterKey);
+
+    // Try server-side authentication if available
+    if (!authenticated) {
+      try {
+        const serverAuthRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
+        });
+        if (serverAuthRes.ok) {
+          const serverData = await serverAuthRes.json();
+          if (serverData.success && serverData.user) {
+            authenticated = true;
+            matchedUser = serverData.user;
+          }
+        }
+      } catch {
+        // offline or static fallback
+      }
+    }
+
+    // Try Firebase auth if still not authenticated
+    if (!authenticated) {
+      try {
+        const cred = await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPass);
+        if (cred.user) {
+          authenticated = true;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!authenticated) {
+      throw new Error(
+        'Incorrect password. Please enter the valid password provided by agency administration.'
+      );
+    }
+
+    // Ensure role is admin
+    if ((matchedUser.role as string) === 'super_admin') {
+      matchedUser = { ...matchedUser, role: 'admin' };
+    }
+
+    // Successful login
+    localStorage.setItem('agency_user_uid', matchedUser.uid);
+    setCurrentUser(matchedUser);
   };
 
   const loginWithRecoveryKey = async (recoveryKey: string, email?: string) => {
     setError(null);
-    const res = await fetch('/api/auth/super-admin-recovery', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recoveryKey: recoveryKey.trim(), email: email?.trim() })
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success || !data.user) {
-      throw new Error(data.error || 'Invalid secret recovery key.');
+    const trimmedKey = recoveryKey.trim();
+
+    if (trimmedKey === 'Tahahc2020' || trimmedKey === 'COFOUNDER-AGENCY-2026') {
+      const adminUser = allUsers.find((u) => u.role === 'admin' || (u.role as string) === 'super_admin') || DEFAULT_AUTHORIZED_ROSTER[0];
+      const normalizedUser = { ...adminUser, role: 'admin' as const };
+      localStorage.setItem('agency_user_uid', normalizedUser.uid);
+      setCurrentUser(normalizedUser);
+      return;
     }
-    localStorage.setItem('agency_user_uid', data.user.uid);
-    setCurrentUser(data.user);
+
+    try {
+      const res = await fetch('/api/auth/admin-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recoveryKey: trimmedKey, email: email?.trim() })
+      });
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        const normalized = { ...data.user, role: 'admin' };
+        localStorage.setItem('agency_user_uid', normalized.uid);
+        setCurrentUser(normalized);
+        return;
+      }
+    } catch {
+      // ignore
+    }
+
+    throw new Error('Invalid secret recovery key.');
   };
 
   const signup = async (name: string, designation: string, email: string, pass: string) => {
     setError(null);
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
-      const isChahat = email.toLowerCase().includes('chahat') || name.toLowerCase().includes('chahat');
-
-      const profile: UserProfile = {
-        uid: cred.user.uid,
-        name: name.trim(),
-        designation: designation.trim() || (isChahat ? 'Managing Director' : 'Team Member'),
-        email: email.trim(),
-        role: isChahat ? 'super_admin' : 'member',
-        // First-time signup defaults to 'pending', except for Chahat (super_admin)
-        status: isChahat ? 'active' : 'pending',
-        createdAt: new Date().toISOString()
-      };
-
-      // Save to Firestore
-      try {
-        await setDoc(doc(db, 'users', profile.uid), profile);
-      } catch (e) {
-        console.warn('Saving new user to Firestore:', e);
-      }
-
-      // Sync to server backup
-      await fetch('/api/sync/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile)
-      });
-
-      setCurrentUser(profile);
-      setAllUsers((prev) => [...prev.filter((u) => u.uid !== profile.uid), profile]);
-    } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') {
-        throw new Error('An account with this email already exists.');
-      } else if (err.code === 'auth/weak-password') {
-        throw new Error('Password must be at least 6 characters long.');
-      } else {
-        throw new Error(err.message || 'Registration failed.');
-      }
-    }
+    throw new Error('Public registration is disabled. Only agency administrators can add accounts.');
   };
 
   const logout = async () => {
     localStorage.removeItem('agency_user_uid');
-    await signOut(auth);
+    try {
+      await signOut(auth);
+    } catch {
+      // ignore
+    }
     setFirebaseUser(null);
     setCurrentUser(null);
   };
 
   const resetPasswordByEmail = async (email: string) => {
-    await sendPasswordResetEmail(auth, email.trim());
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+    } catch {
+      // fallback message
+    }
   };
 
   const resetPasswordByRecoveryCode = async (email: string, code: string, newPass: string) => {
-    const res = await fetch('/api/recovery/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: email.trim(),
-        recoveryCode: code.trim(),
-        newPassword: newPass
-      })
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || 'Password reset failed.');
+    const trimmedCode = code.trim();
+    if (trimmedCode === 'Tahahc2020' || trimmedCode === 'COFOUNDER-AGENCY-2026') {
+      const user = allUsers.find((u) => u.email?.toLowerCase() === email.trim().toLowerCase());
+      if (user) {
+        const updated = allUsers.map((u) => (u.uid === user.uid ? { ...u, password: newPass } : u));
+        persistRoster(updated);
+        return { success: true, message: 'Password updated successfully!' };
+      }
     }
-    return data;
+
+    try {
+      const res = await fetch('/api/recovery/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          recoveryCode: code.trim(),
+          newPassword: newPass
+        })
+      });
+      const data = await res.json();
+      if (res.ok) return data;
+    } catch {
+      // fallback
+    }
+
+    throw new Error('Unable to reset password. Please check your recovery code.');
   };
 
   const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
     const updatedData = {
       ...updates,
       updatedAt: new Date().toISOString(),
-      updatedBy: currentUser?.name || currentUser?.email || 'Admin'
+      updatedBy: currentUser?.name || currentUser?.email || 'Managing Director'
     };
 
-    // Update in Firestore
-    try {
-      await updateDoc(doc(db, 'users', uid), updatedData);
-    } catch (e) {
-      console.warn('Updating user profile in Firestore:', e);
-    }
-
-    // Update on server
-    await fetch('/api/sync/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, ...updatedData })
-    });
-
-    // Update local state
-    setAllUsers((prev) =>
-      prev.map((u) => (u.uid === uid ? { ...u, ...updatedData } : u))
-    );
+    const updatedRoster = allUsers.map((u) => (u.uid === uid ? { ...u, ...updatedData } : u));
+    persistRoster(updatedRoster);
 
     if (currentUser && currentUser.uid === uid) {
       setCurrentUser((prev) => (prev ? { ...prev, ...updatedData } : null));
+    }
+
+    try {
+      await updateDoc(doc(db, 'users', uid), updatedData);
+    } catch {
+      // fallback
+    }
+
+    try {
+      await fetch('/api/admin/update-credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid, ...updatedData })
+      });
+    } catch {
+      // fallback
+    }
+  };
+
+  // Direct provision by Managing Director
+  const provisionUserDirect = async (user: Partial<UserProfile> & { password?: string }) => {
+    const uid = user.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newProfile: UserProfile = {
+      uid,
+      name: user.name?.trim() || 'Team Member',
+      designation: user.designation?.trim() || 'Team Member',
+      email: user.email?.trim().toLowerCase() || '',
+      role: user.role || 'member',
+      status: 'active',
+      password: user.password?.trim() || 'agency2026',
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = [...allUsers.filter((u) => u.uid !== uid && u.email !== newProfile.email), newProfile];
+    persistRoster(updated);
+
+    try {
+      await setDoc(doc(db, 'users', uid), newProfile);
+    } catch {
+      // fallback
+    }
+
+    try {
+      await fetch('/api/admin/provision-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newProfile)
+      });
+    } catch {
+      // fallback
+    }
+  };
+
+  // Direct delete by Managing Director
+  const deleteUserDirect = async (uid: string) => {
+    const updated = allUsers.filter((u) => u.uid !== uid);
+    persistRoster(updated);
+
+    try {
+      await deleteDoc(doc(db, 'users', uid));
+    } catch {
+      // fallback
+    }
+
+    try {
+      await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid })
+      });
+    } catch {
+      // fallback
     }
   };
 
   const refreshUsers = async () => {
     try {
       const res = await fetch('/api/sync/users');
-      const data = await res.json();
-      if (data.users) {
-        setAllUsers(data.users);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.users && data.users.length > 0) {
+          persistRoster(data.users);
+        }
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
   };
@@ -396,7 +525,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPasswordByRecoveryCode,
         updateUserProfile,
         allUsers,
-        refreshUsers
+        refreshUsers,
+        provisionUserDirect,
+        deleteUserDirect
       }}
     >
       {children}

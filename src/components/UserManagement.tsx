@@ -27,9 +27,8 @@ import {
 } from 'lucide-react';
 
 export const UserManagement: React.FC = () => {
-  const { currentUser, allUsers, updateUserProfile, refreshUsers } = useAuth();
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin';
+  const { currentUser, allUsers, updateUserProfile, refreshUsers, provisionUserDirect, deleteUserDirect } = useAuth();
+  const isAdmin = currentUser?.role === 'admin' || (currentUser?.role as string) === 'super_admin';
 
   const [searchFilter, setSearchFilter] = useState('');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -54,7 +53,7 @@ export const UserManagement: React.FC = () => {
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [copiedUid, setCopiedUid] = useState<string | null>(null);
 
-  // Recovery Key Management (Managing Director only)
+  // Recovery Key Management (All Admins have equal access)
   const [recoveryStatus, setRecoveryStatus] = useState<{ isConfigured: boolean; lastUpdatedAt?: string } | null>(null);
   const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
   const [newRecoveryKey, setNewRecoveryKey] = useState('');
@@ -64,13 +63,13 @@ export const UserManagement: React.FC = () => {
 
   // Fetch recovery status
   useEffect(() => {
-    if (isSuperAdmin) {
+    if (isAdmin) {
       fetch('/api/recovery/status')
         .then((res) => res.json())
         .then((data) => setRecoveryStatus(data))
         .catch(() => {});
     }
-  }, [isSuperAdmin]);
+  }, [isAdmin]);
 
   // Toggle password visibility
   const togglePasswordVisibility = (uid: string) => {
@@ -84,17 +83,13 @@ export const UserManagement: React.FC = () => {
     setTimeout(() => setCopiedUid(null), 1800);
   };
 
-  // Open edit modal
+  // Open edit modal - All admins have equal power!
   const handleStartEdit = (u: UserProfile) => {
-    if (!isSuperAdmin && (u.role === 'admin' || u.role === 'super_admin')) {
-      alert('Admins cannot modify executive management accounts.');
-      return;
-    }
     setEditingUser(u);
     setEditName(u.name || '');
     setEditEmail(u.email || '');
     setEditDesignation(u.designation || '');
-    setEditRole(u.role === 'super_admin' ? 'admin' : u.role);
+    setEditRole((u.role as string) === 'super_admin' ? 'admin' : u.role);
     setEditPassword(u.password || '');
   };
 
@@ -106,30 +101,14 @@ export const UserManagement: React.FC = () => {
 
     try {
       const payload: any = {
-        uid: editingUser.uid,
         name: editName.trim(),
         email: editEmail.trim().toLowerCase(),
         designation: editDesignation.trim(),
-        password: editPassword.trim()
+        password: editPassword.trim(),
+        role: editRole
       };
 
-      if (isSuperAdmin && editingUser.role !== 'super_admin') {
-        payload.role = editRole;
-      }
-
-      // Call dedicated credential update endpoint
-      const res = await fetch('/api/admin/update-credentials', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to update credentials.');
-      }
-
-      await refreshUsers();
+      await updateUserProfile(editingUser.uid, payload);
       setEditingUser(null);
     } catch (err: any) {
       alert(err.message || 'Failed to update user.');
@@ -140,8 +119,9 @@ export const UserManagement: React.FC = () => {
 
   // Delete User
   const handleDeleteUser = async (u: UserProfile) => {
-    if (u.role === 'super_admin') {
-      alert('Managing Director account cannot be removed.');
+    const adminCount = allUsers.filter(user => user.role === 'admin' || (user.role as string) === 'super_admin').length;
+    if ((u.role === 'admin' || (u.role as string) === 'super_admin') && adminCount <= 1) {
+      alert('Cannot delete the only remaining Admin account in the system.');
       return;
     }
 
@@ -149,18 +129,7 @@ export const UserManagement: React.FC = () => {
     if (!confirm) return;
 
     try {
-      const res = await fetch('/api/admin/delete-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: u.uid })
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete user.');
-      }
-
-      await refreshUsers();
+      await deleteUserDirect(u.uid);
       if (editingUser?.uid === u.uid) {
         setEditingUser(null);
       }
@@ -184,24 +153,14 @@ export const UserManagement: React.FC = () => {
 
     setAddSaving(true);
     try {
-      const res = await fetch('/api/admin/provision-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newName.trim(),
-          email: newEmail.trim().toLowerCase(),
-          designation: newDesignation.trim() || (newRole === 'intern' ? 'Intern' : 'Team Member'),
-          role: newRole,
-          password: newPassword.trim()
-        })
+      await provisionUserDirect({
+        name: newName.trim(),
+        email: newEmail.trim().toLowerCase(),
+        designation: newDesignation.trim() || (newRole === 'intern' ? 'Intern' : 'Team Member'),
+        role: newRole,
+        password: newPassword.trim()
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to provision user.');
-      }
-
-      await refreshUsers();
       setIsAddModalOpen(false);
       setNewName('');
       setNewDesignation('');
@@ -284,19 +243,17 @@ export const UserManagement: React.FC = () => {
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-bold text-slate-800 tracking-tight">
-              {isSuperAdmin ? 'Personnel Directory & Credentials' : 'Team Directory'}
+              Personnel Directory & Credentials
             </h2>
             <p className="text-[11px] text-slate-500 font-medium">
-              {isSuperAdmin
-                ? 'Manage agency members, provision accounts, and update passwords.'
-                : 'View co-founders and team members.'}
+              Manage agency members, provision accounts, and update passwords.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Recovery Key Modal Trigger */}
-          {isSuperAdmin && (
+          {/* Recovery Key Modal Trigger - Available to all Admins */}
+          {isAdmin && (
             <button
               type="button"
               id="btn-recovery-key"
@@ -359,20 +316,19 @@ export const UserManagement: React.FC = () => {
                   <th className="py-3 px-4 sm:px-6">Team Member</th>
                   <th className="py-3 px-4">Designation</th>
                   <th className="py-3 px-4">Role</th>
-                  {isSuperAdmin && <th className="py-3 px-4">Assigned Password</th>}
+                  {isAdmin && <th className="py-3 px-4">Assigned Password</th>}
                   <th className="py-3 px-4 sm:px-6 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {activeUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={isSuperAdmin ? 5 : 4} className="py-10 text-center text-slate-400 text-xs">
+                    <td colSpan={isAdmin ? 5 : 4} className="py-10 text-center text-slate-400 text-xs">
                       No matching team members found.
                     </td>
                   </tr>
                 ) : (
                   activeUsers.map((u) => {
-                    const isProtectedFromAdmin = !isSuperAdmin && (u.role === 'admin' || u.role === 'super_admin');
                     const isPasswordShown = !!visiblePasswords[u.uid];
                     const userPassword = u.password || '••••••••';
 
@@ -407,8 +363,8 @@ export const UserManagement: React.FC = () => {
                           <RoleBadge name={u.name} role={u.role} designation={u.designation} />
                         </td>
 
-                        {/* Password Column (Managing Director only) */}
-                        {isSuperAdmin && (
+                        {/* Password Column (All Admins have equal access) */}
+                        {isAdmin && (
                           <td className="py-3.5 px-4">
                             <div className="flex items-center gap-1.5">
                               <span className="font-mono text-xs text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 select-all">
@@ -440,31 +396,27 @@ export const UserManagement: React.FC = () => {
 
                         {/* Actions */}
                         <td className="py-3.5 px-4 sm:px-6 text-right">
-                          {isProtectedFromAdmin ? (
-                            <span className="text-[10px] text-slate-400 italic">Protected</span>
-                          ) : (
-                            <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(u)}
+                              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-3 h-3 text-slate-400" />
+                              <span>Edit</span>
+                            </button>
+
+                            {isAdmin && (
                               <button
                                 type="button"
-                                onClick={() => handleStartEdit(u)}
-                                className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+                                onClick={() => handleDeleteUser(u)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title="Revoke & Delete"
                               >
-                                <Edit2 className="w-3 h-3 text-slate-400" />
-                                <span>Edit</span>
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
-
-                              {isSuperAdmin && u.role !== 'super_admin' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteUser(u)}
-                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                  title="Revoke & Delete"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -534,8 +486,8 @@ export const UserManagement: React.FC = () => {
                   />
                 </div>
 
-                {/* Password field for Managing Director */}
-                {isSuperAdmin && (
+                {/* Password field for Admins */}
+                {isAdmin && (
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
                       <span>Assigned Password</span>
@@ -551,8 +503,8 @@ export const UserManagement: React.FC = () => {
                   </div>
                 )}
 
-                {/* Role selection ONLY available to Managing Director */}
-                {isSuperAdmin && editingUser.role !== 'super_admin' && (
+                {/* Role selection available to all Admins */}
+                {isAdmin && (
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       System Role
@@ -570,7 +522,7 @@ export const UserManagement: React.FC = () => {
                 )}
 
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  {isSuperAdmin && editingUser.role !== 'super_admin' ? (
+                  {isAdmin ? (
                     <button
                       type="button"
                       onClick={() => handleDeleteUser(editingUser)}
@@ -698,7 +650,7 @@ export const UserManagement: React.FC = () => {
                   >
                     <option value="member">Member</option>
                     <option value="intern">Intern</option>
-                    {isSuperAdmin && <option value="admin">Admin</option>}
+                    {isAdmin && <option value="admin">Admin</option>}
                   </select>
                 </div>
 
@@ -723,8 +675,8 @@ export const UserManagement: React.FC = () => {
           </div>
         )}
 
-        {/* MODAL 3: Managing Director Secret Key Management */}
-        {isKeyModalOpen && isSuperAdmin && (
+        {/* MODAL 3: Administrator System Security Key Management */}
+        {isKeyModalOpen && isAdmin && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-5">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -734,7 +686,7 @@ export const UserManagement: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">System Security Key</h3>
-                    <p className="text-xs text-slate-500">Managing Director master recovery credential.</p>
+                    <p className="text-xs text-slate-500">Administrator master recovery credential (Tahahc2020).</p>
                   </div>
                 </div>
                 <button

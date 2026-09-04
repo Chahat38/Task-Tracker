@@ -24,8 +24,9 @@ export const PendingApprovalsPage: React.FC<PendingApprovalsPageProps> = ({
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Security guard: If somehow a non-super_admin lands here, redirect immediately
-  if (!currentUser || currentUser.role !== 'super_admin') {
+  // Security guard: Accessible to all admins
+  const isAdmin = currentUser?.role === 'admin' || (currentUser?.role as string) === 'super_admin';
+  if (!currentUser || !isAdmin) {
     if (onRedirectToTeam) onRedirectToTeam();
     return null;
   }

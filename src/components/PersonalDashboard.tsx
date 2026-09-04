@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProgressEntry } from '../types';
 import { DailyProgressForm } from './DailyProgressForm';
+import { PersonalAssignedTasks } from './PersonalAssignedTasks';
 import { Footer } from './Footer';
 import { RoleBadge } from './RoleBadge';
 import { formatDate, getTodayDateString } from '../utils/rules';
@@ -33,10 +34,16 @@ export const PersonalDashboard: React.FC = () => {
   // Real-time Firestore sync for user's own progress entries
   useEffect(() => {
     let unsubscribeFirestore: (() => void) | undefined;
+    let isServerAvailable = true;
 
     const fetchServerEntries = async () => {
+      if (!isServerAvailable) return;
       try {
         const res = await fetch('/api/sync/entries');
+        if (!res.ok) {
+          isServerAvailable = false;
+          return;
+        }
         const data = await res.json();
         if (data.entries) {
           const userEntries = data.entries.filter((e: ProgressEntry) => e.userId === currentUser.uid);
@@ -44,7 +51,7 @@ export const PersonalDashboard: React.FC = () => {
           setEntries(userEntries);
         }
       } catch {
-        // ignore
+        isServerAvailable = false;
       } finally {
         setLoadingEntries(false);
       }
@@ -74,11 +81,9 @@ export const PersonalDashboard: React.FC = () => {
     }
 
     fetchServerEntries();
-    const interval = setInterval(fetchServerEntries, 5000);
 
     return () => {
       if (unsubscribeFirestore) unsubscribeFirestore();
-      clearInterval(interval);
     };
   }, [currentUser.uid]);
 
@@ -107,10 +112,16 @@ export const PersonalDashboard: React.FC = () => {
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              My Personal Workspace
+              {currentUser.role === 'intern'
+                ? 'Intern Learning & Task Workspace'
+                : currentUser.role === 'admin'
+                ? 'Admin Daily Tasks & Deliverables'
+                : 'My Personal Workspace'}
             </h2>
             <p className="text-[11px] text-slate-500 font-medium">
-              Private workspace • Daily activity and task logs
+              {currentUser.role === 'intern'
+                ? 'Track your daily learning, assigned tasks, hours spent, and supervisor reviews'
+                : 'Daily activity tracking • Enter task details, pending work, and blockers'}
             </p>
           </div>
         </div>
@@ -135,7 +146,7 @@ export const PersonalDashboard: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-200 bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                {currentUser.role === 'intern' ? 'Intern' : 'Team Member'}
+                {currentUser.role === 'intern' ? 'Internee' : currentUser.role === 'admin' ? 'Administrator' : 'Team Member'}
               </span>
               <span className="text-xs text-emerald-100 font-semibold">{currentUser.designation}</span>
             </div>
@@ -143,7 +154,9 @@ export const PersonalDashboard: React.FC = () => {
               Welcome back, {currentUser.name}
             </h1>
             <p className="text-xs text-emerald-100/80">
-              Log your day-to-day activities, check off completed tasks, and note pending items.
+              {currentUser.role === 'intern'
+                ? 'Enter your day-to-day task deliverables, tools learned, blockers, and questions for mentors.'
+                : 'Log your day-to-day activities, itemize completed tasks, and note pending items for team visibility.'}
             </p>
           </div>
 
@@ -163,6 +176,9 @@ export const PersonalDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Tasks Assigned to Member by Management */}
+        <PersonalAssignedTasks />
 
         {/* Daily Progress Entry Form */}
         <DailyProgressForm

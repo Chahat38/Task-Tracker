@@ -33,10 +33,7 @@ export function getRoleBadgeLabel(name: string, role: UserRole, designation?: st
   if (isSpecialNoRoleMember(name, designation)) {
     return null;
   }
-  if (role === 'super_admin') {
-    return null; // Super admin role is internal only
-  }
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'super_admin') {
     return 'Admin';
   }
   if (role === 'member') {
@@ -54,6 +51,7 @@ export function getRoleBadgeLabel(name: string, role: UserRole, designation?: st
 export function getRoleBadgeStyle(role: UserRole): { bg: string; text: string; border: string } {
   switch (role) {
     case 'admin':
+    case 'super_admin' as any:
       return {
         bg: 'bg-amber-100',
         text: 'text-amber-700',

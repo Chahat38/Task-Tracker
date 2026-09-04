@@ -29,10 +29,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   if (!currentUser) return null;
 
-  const isSuperAdmin = currentUser.role === 'super_admin';
-  const isAdmin = currentUser.role === 'admin';
-  const canViewTeam = isSuperAdmin || isAdmin;
-  const canManageUsers = isSuperAdmin || isAdmin;
+  const isAdmin = currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin';
+  const isIntern = currentUser.role === 'intern';
+  const canViewTeam = isAdmin;
+  const canManageUsers = isAdmin;
 
   const handleSelectTab = (tab: 'personal' | 'team' | 'users' | 'approvals') => {
     onTabChange(tab);
@@ -50,13 +50,13 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="p-6 border-b border-slate-100">
           <h1 className="text-xl font-bold tracking-tight text-indigo-600">AGENCY FLOW</h1>
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mt-1">
-            Internal Progress Tracker
+            Internal Operations Portal
           </p>
         </div>
 
         {/* Sidebar Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {/* Team Feed / Command Center */}
+          {/* Admin Command Center */}
           {canViewTeam && (
             <button
               id="nav-tab-team"
@@ -64,35 +64,31 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => handleSelectTab('team')}
               className={`w-full px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
                 currentTab === 'team'
-                  ? isSuperAdmin
-                    ? 'bg-slate-900 text-white font-bold shadow-sm'
-                    : 'bg-blue-50 text-blue-800 font-bold border border-blue-200/60'
+                  ? 'bg-slate-900 text-white font-bold shadow-sm'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <LayoutDashboard className={`w-4 h-4 shrink-0 ${isSuperAdmin && currentTab === 'team' ? 'text-indigo-400' : 'text-slate-500'}`} />
-              <span>{isSuperAdmin ? 'Command Center' : 'Operations & Reviews'}</span>
+              <LayoutDashboard className={`w-4 h-4 shrink-0 ${currentTab === 'team' ? 'text-indigo-400' : 'text-slate-500'}`} />
+              <span>Executive Command Center</span>
             </button>
           )}
 
-          {/* Personal Progress */}
-          {!isSuperAdmin && (
-            <button
-              id="nav-tab-personal"
-              type="button"
-              onClick={() => handleSelectTab('personal')}
-              className={`w-full px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
-                currentTab === 'personal'
-                  ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <FileText className={`w-4 h-4 shrink-0 ${currentTab === 'personal' ? 'text-emerald-600' : 'text-slate-500'}`} />
-              <span>{isAdmin ? 'My Daily Log' : 'My Workspace'}</span>
-            </button>
-          )}
+          {/* Personal Progress / Task Log (Available to EVERYONE: Admin, Member, Intern) */}
+          <button
+            id="nav-tab-personal"
+            type="button"
+            onClick={() => handleSelectTab('personal')}
+            className={`w-full px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer ${
+              currentTab === 'personal'
+                ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/60'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <FileText className={`w-4 h-4 shrink-0 ${currentTab === 'personal' ? 'text-emerald-600' : 'text-slate-500'}`} />
+            <span>{isAdmin ? 'Log My Own Tasks' : isIntern ? 'Internship Tasks & Log' : 'My Daily Tasks & Log'}</span>
+          </button>
 
-          {/* Team Management */}
+          {/* Team Management - Equal for all Admins */}
           {canManageUsers && (
             <button
               id="nav-tab-users"
@@ -105,23 +101,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Users className="w-4 h-4 shrink-0 text-slate-500" />
-              <span>{isSuperAdmin ? 'Personnel & Passwords' : 'Team Directory'}</span>
+              <span>Personnel & Passwords</span>
             </button>
           )}
 
-          {/* Pending Approvals: ONLY visible to Managing Director (super_admin) */}
-          {isSuperAdmin && (
+          {/* Pending Approvals: Equal for all Admins */}
+          {isAdmin && (
             <button
               id="nav-tab-approvals"
               type="button"
               onClick={() => handleSelectTab('approvals')}
-              className={`w-full px-3 py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer relative ${
+              className={`w-full px-3 py-2.5 rounded-xl font-medium text-xs sm:text-sm flex items-center gap-3 transition-colors cursor-pointer relative ${
                 currentTab === 'approvals'
-                  ? 'bg-amber-50 text-amber-900 font-semibold'
+                  ? 'bg-amber-50 text-amber-900 font-bold border border-amber-200/60'
                   : 'text-slate-500 hover:bg-slate-50'
               }`}
             >
-              <CheckSquare className="w-5 h-5 shrink-0 text-amber-600" />
+              <CheckSquare className="w-4 h-4 shrink-0 text-amber-600" />
               <span>Pending Approvals</span>
               {pendingCount > 0 && (
                 <span className="ml-auto bg-amber-600 text-white text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
@@ -213,29 +209,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => handleSelectTab('team')}
               className={`w-full px-3 py-2 rounded-lg font-medium text-xs flex items-center gap-3 ${
                 currentTab === 'team'
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                  ? 'bg-slate-900 text-white font-semibold'
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
               <LayoutDashboard className="w-4 h-4" />
-              <span>Real-time Feed</span>
+              <span>Command Center</span>
             </button>
           )}
 
-          {!isSuperAdmin && (
-            <button
-              type="button"
-              onClick={() => handleSelectTab('personal')}
-              className={`w-full px-3 py-2 rounded-lg font-medium text-xs flex items-center gap-3 ${
-                currentTab === 'personal'
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>My Progress</span>
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => handleSelectTab('personal')}
+            className={`w-full px-3 py-2 rounded-lg font-medium text-xs flex items-center gap-3 ${
+              currentTab === 'personal'
+                ? 'bg-emerald-50 text-emerald-800 font-semibold'
+                : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>{isAdmin ? 'My Daily Work & Tasks' : isIntern ? 'Intern Progress & Tasks' : 'My Daily Tasks'}</span>
+          </button>
 
           {canManageUsers && (
             <button
@@ -247,12 +241,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
-              <Users className="w-4 h-4" />
-              <span>Team Management</span>
+              <Users className="w-4 h-4 text-slate-500" />
+              <span>Personnel & Passwords</span>
             </button>
           )}
 
-          {isSuperAdmin && (
+          {isAdmin && (
             <button
               type="button"
               onClick={() => handleSelectTab('approvals')}
