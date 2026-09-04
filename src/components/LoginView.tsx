@@ -47,6 +47,21 @@ export const LoginView: React.FC = () => {
     }
   };
 
+  const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
+    setEmail(quickEmail);
+    setPassword(quickPass);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setSubmitting(true);
+    try {
+      await login(quickEmail, quickPass);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Login failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -205,11 +220,68 @@ export const LoginView: React.FC = () => {
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              <div className="pt-2 border-t border-slate-700/60 text-center">
+              {/* Authorized Quick Access Shortcuts */}
+              <div className="pt-3 border-t border-slate-700/60">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Quick Sign-In
+                  </span>
+                  <span className="text-[10px] text-slate-500">Authorized Team</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('chahathassanain@gmail.com', 'Tahahc2020')}
+                    className="p-2 rounded-lg bg-indigo-950/50 hover:bg-indigo-900/60 border border-indigo-500/30 text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="text-[11px] font-bold text-indigo-200 group-hover:text-white flex items-center justify-between">
+                      <span>Chahat</span>
+                      <span className="text-[9px] bg-indigo-500/30 text-indigo-200 px-1 py-0.5 rounded font-medium">Admin</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">Managing Director</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('saeed@agency.com', 'agency2026')}
+                    className="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="text-[11px] font-bold text-slate-200 group-hover:text-white flex items-center justify-between">
+                      <span>M. Saeed</span>
+                      <span className="text-[9px] bg-slate-700 text-slate-300 px-1 py-0.5 rounded font-medium">Admin</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">CEO</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('maham@agency.com', 'agency2026')}
+                    className="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="text-[11px] font-bold text-slate-200 group-hover:text-white flex items-center justify-between">
+                      <span>Maham Noor</span>
+                      <span className="text-[9px] bg-emerald-950/60 text-emerald-300 px-1 py-0.5 rounded font-medium">Member</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">Content Creator</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('remsha@agency.com', 'agency2026')}
+                    className="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="text-[11px] font-bold text-slate-200 group-hover:text-white flex items-center justify-between">
+                      <span>Remsha</span>
+                      <span className="text-[9px] bg-emerald-950/60 text-emerald-300 px-1 py-0.5 rounded font-medium">Member</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">Social Media Head</div>
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-2 text-center">
                 <p className="text-[11px] text-slate-400 leading-relaxed">
                   Accounts are provisioned by agency administration.
-                  <br />
-                  Random registrations are strictly restricted.
                 </p>
               </div>
             </form>

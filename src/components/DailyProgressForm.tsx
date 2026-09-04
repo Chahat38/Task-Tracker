@@ -247,12 +247,12 @@ export const DailyProgressForm: React.FC<DailyProgressFormProps> = ({
           />
         </div>
 
-        {/* 2. Tasks Completed (Task jo complete kiya) */}
+        {/* 2. Tasks Completed */}
         <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Tasks Completed Today (Task jo complete kiya)</span>
+              <span>Tasks Completed Today</span>
             </label>
             <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-full">
               {completedTasks.length} {completedTasks.length === 1 ? 'task' : 'tasks'} logged
@@ -323,12 +323,12 @@ export const DailyProgressForm: React.FC<DailyProgressFormProps> = ({
           </div>
         </div>
 
-        {/* 3. Tasks Remaining / Pending (Jo rehta ho mention ho) */}
+        {/* 3. Tasks Remaining / Pending */}
         <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
               <Clock className="w-4 h-4 text-amber-600" />
-              <span>Remaining / Pending Tasks (Jo kaam rehta ho)</span>
+              <span>Remaining / Pending Tasks</span>
             </label>
             <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full">
               {pendingTasks.length} {pendingTasks.length === 1 ? 'pending' : 'pending'}

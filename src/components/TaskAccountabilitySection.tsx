@@ -151,7 +151,7 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
           <div className="flex items-center space-x-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-              Direct Task Accountability (Kis Banda Na Kya Kaam Kiya)
+              Direct Task Accountability & Deliverables
             </h2>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -183,7 +183,7 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider block">
-              Completed (Kaam Ho Gaya)
+              Completed Tasks
             </span>
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
           </div>
@@ -196,7 +196,7 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wider block">
-              In Progress (Kaam Chal Raha)
+              In Progress
             </span>
             <span className="w-2 h-2 rounded-full bg-blue-500"></span>
           </div>
@@ -207,7 +207,7 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider block">
-              Pending (Baki Hai)
+              Pending Tasks
             </span>
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
           </div>
@@ -258,9 +258,9 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
               className="bg-slate-50 border border-slate-200 rounded-lg text-xs py-1.5 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="all">All Statuses</option>
-              <option value="completed">Completed (Kaam Ho Gaya)</option>
-              <option value="in_progress">In Progress (Active)</option>
-              <option value="pending">Pending (Shuru Nhi Hua)</option>
+              <option value="completed">Completed</option>
+              <option value="in_progress">In Progress</option>
+              <option value="pending">Pending</option>
               <option value="blocked">Blocked</option>
             </select>
           </div>
@@ -368,21 +368,21 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
                                 {isCompleted && (
                                   <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-300/60">
                                     <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                    <span>Completed (Mukammal)</span>
+                                    <span>Completed</span>
                                   </span>
                                 )}
 
                                 {isInProgress && (
                                   <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded-full border border-blue-300/60">
                                     <Clock className="w-3 h-3 text-blue-600" />
-                                    <span>In Progress (Kaam Chal Raha)</span>
+                                    <span>In Progress</span>
                                   </span>
                                 )}
 
                                 {isPending && (
                                   <span className="inline-flex items-center space-x-1 text-[10px] font-semibold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-300/60">
                                     <AlertCircle className="w-3 h-3 text-amber-600" />
-                                    <span>Pending (Shuru Nhi Hua)</span>
+                                    <span>Pending</span>
                                   </span>
                                 )}
 

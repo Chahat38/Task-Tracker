@@ -78,7 +78,7 @@ export const PersonalAssignedTasks: React.FC = () => {
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-              Tasks Assigned To You by Management (Aap Ko Diye Gaye Tasks)
+              Tasks Assigned To You by Management
             </h3>
             <p className="text-[11px] text-slate-500">
               Direct accountability items assigned by the Managing Director. Mark your progress and report completed work.
@@ -259,7 +259,7 @@ export const PersonalAssignedTasks: React.FC = () => {
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Detail of Work Accomplished (Kya Kaam Kiya) *
+                        Detail of Work Accomplished *
                       </label>
                       <textarea
                         rows={3}

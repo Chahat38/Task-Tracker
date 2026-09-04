@@ -379,7 +379,7 @@ export const AdminOperationsDashboard: React.FC<AdminOperationsDashboardProps> =
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Completed Tasks (Task jo complete kiya)</span>
+                          <span>Completed Tasks</span>
                         </span>
                         {hasCompletedList && (
                           <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
