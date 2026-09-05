@@ -423,11 +423,29 @@ app.post('/api/admin/provision-user', (req, res) => {
 // Admin endpoint: Update user details AND/OR password
 app.post('/api/admin/update-credentials', (req, res) => {
   const { uid, name, email, designation, role, password, status } = req.body;
-  if (!uid || !store.users[uid]) {
-    return res.status(404).json({ error: 'User not found in directory.' });
+  
+  let currentUser = uid ? store.users[uid] : null;
+  if (!currentUser && email) {
+    currentUser = Object.values(store.users).find(
+      (u: any) => u.email?.toLowerCase() === email.toLowerCase().trim()
+    );
   }
 
-  const currentUser = store.users[uid];
+  if (!currentUser) {
+    // If not found, upsert user
+    const targetUid = uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    currentUser = {
+      uid: targetUid,
+      name: name?.trim() || 'Team Member',
+      email: (email || '').toLowerCase().trim(),
+      designation: designation?.trim() || 'Team Member',
+      role: role === 'super_admin' ? 'admin' : (role || 'member'),
+      status: status || 'active',
+      createdAt: new Date().toISOString()
+    };
+    store.users[targetUid] = currentUser;
+  }
+
   const oldEmail = (currentUser.email || '').toLowerCase().trim();
   const newEmail = (email ? email.toLowerCase().trim() : oldEmail);
 
@@ -458,6 +476,52 @@ app.post('/api/admin/update-credentials', (req, res) => {
       ...currentUser,
       password: store.credentials[currentUser.email.toLowerCase().trim()]
     }
+  });
+});
+
+// Admin endpoint: Bulk synchronize entire roster & passwords across all devices
+app.post('/api/sync/roster-bulk', (req, res) => {
+  const { roster } = req.body;
+  if (!Array.isArray(roster)) {
+    return res.status(400).json({ error: 'Roster array is required.' });
+  }
+
+  let updatedCount = 0;
+  for (const u of roster) {
+    if (!u || !u.email) continue;
+    const normEmail = u.email.toLowerCase().trim();
+    const existing = Object.values(store.users).find((x: any) => x.email?.toLowerCase() === normEmail);
+    const targetUid = u.uid || existing?.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    store.users[targetUid] = {
+      ...(existing || {}),
+      uid: targetUid,
+      name: u.name || existing?.name || 'Team Member',
+      email: normEmail,
+      designation: u.designation || existing?.designation || 'Team Member',
+      role: u.role === 'super_admin' ? 'admin' : (u.role || existing?.role || 'member'),
+      status: u.status || existing?.status || 'active',
+      createdAt: u.createdAt || existing?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (u.password && typeof u.password === 'string' && u.password.trim()) {
+      store.credentials[normEmail] = u.password.trim();
+    }
+    updatedCount++;
+  }
+
+  saveStore();
+
+  const allUsersWithPasswords = Object.values(store.users).map((u: any) => ({
+    ...u,
+    password: store.credentials[(u.email || '').toLowerCase().trim()] || ''
+  }));
+
+  return res.json({
+    success: true,
+    message: `Synchronized ${updatedCount} users in master store.`,
+    users: allUsersWithPasswords
   });
 });
 

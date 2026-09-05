@@ -198,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync users to LocalStorage and ensure credentials vault stays in sync
+  // Sync users to LocalStorage, credentials vault, and automatically broadcast to backend server
   const persistRoster = useCallback((roster: UserProfile[]) => {
     roster.forEach((u) => {
       if (u.email && u.password) {
@@ -211,13 +211,112 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.warn('Failed to save roster to localStorage:', e);
     }
+
+    // AUTO-SYNC: Immediately commit full roster to server database
+    fetch('/api/sync/roster-bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roster })
+    }).catch(() => {});
+
+    // Broadcast change across browser tabs/windows
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('agency_auto_sync_channel');
+        bc.postMessage('roster_updated');
+        bc.close();
+      }
+    } catch {}
   }, []);
 
-  // Sync users from Firestore and server (with 404 circuit breaker)
+  // REAL-TIME AUTO-SYNC ENGINE ACROSS ALL DEVICES
   useEffect(() => {
     let unsubscribeFirestore: (() => void) | undefined;
-    let isServerAvailable = true;
+    let autoSyncTimer: any = null;
+    let channel: BroadcastChannel | null = null;
 
+    const pullFromServer = async () => {
+      try {
+        const res = await fetch('/api/sync/users');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.users && Array.isArray(data.users) && data.users.length > 0) {
+          setAllUsers((prev) => {
+            const map = new Map<string, UserProfile>();
+            prev.forEach((u) => map.set(u.uid, u));
+
+            let hasChanges = false;
+            data.users.forEach((u: UserProfile) => {
+              const prevUser = map.get(u.uid);
+              const serverPass = u.password;
+              const currentPass = prevUser?.password || getStoredPassword(u.email || '');
+              
+              if (!prevUser || prevUser.name !== u.name || prevUser.email !== u.email || prevUser.designation !== u.designation || (serverPass && serverPass !== currentPass)) {
+                hasChanges = true;
+              }
+
+              const password =
+                serverPass ||
+                prevUser?.password ||
+                getStoredPassword(u.email || '') ||
+                (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
+
+              map.set(u.uid, {
+                ...prevUser,
+                ...u,
+                password
+              });
+
+              if (u.email && password) {
+                saveStoredPassword(u.email, password);
+              }
+            });
+
+            if (!hasChanges && map.size === prev.length) {
+              return prev;
+            }
+
+            const merged = Array.from(map.values());
+            try {
+              localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      } catch {
+        // quiet fallback
+      }
+    };
+
+    // 1. Pull on load immediately
+    pullFromServer();
+
+    // 2. Poll every 3 seconds for 100% automated real-time multi-device sync
+    autoSyncTimer = setInterval(pullFromServer, 3000);
+
+    // 3. Immediately pull whenever screen is unlocked / tab gains focus
+    const onFocus = () => pullFromServer();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        pullFromServer();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // 4. Listen to multi-tab broadcast
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        channel = new BroadcastChannel('agency_auto_sync_channel');
+        channel.onmessage = (e) => {
+          if (e.data === 'roster_updated') {
+            pullFromServer();
+          }
+        };
+      }
+    } catch {}
+
+    // 5. Firestore real-time listener as secondary sync
     try {
       const usersCol = collection(db, 'users');
       unsubscribeFirestore = onSnapshot(
@@ -234,8 +333,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               loaded.forEach((u) => {
                 const prevUser = map.get(u.uid);
                 const password =
-                  prevUser?.password ||
                   u.password ||
+                  prevUser?.password ||
                   getStoredPassword(u.email || '') ||
                   (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
                 map.set(u.uid, {
@@ -248,63 +347,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
               });
               const merged = Array.from(map.values());
-              localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
+              try {
+                localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
+              } catch {}
               return merged;
             });
           }
         },
-        (err) => {
-          console.debug('Firestore users sync notice:', err.message);
-        }
+        () => {}
       );
-    } catch {
-      // fallback
-    }
-
-    // Single probe check for server sync to avoid spamming 404/405 errors if static host
-    const checkServerSync = async () => {
-      if (!isServerAvailable) return;
-      try {
-        const res = await fetch('/api/sync/users');
-        if (!res.ok) {
-          isServerAvailable = false;
-          return;
-        }
-        const data = await res.json();
-        if (data.users && data.users.length > 0) {
-          setAllUsers((prev) => {
-            const map = new Map<string, UserProfile>();
-            prev.forEach((u) => map.set(u.uid, u));
-            data.users.forEach((u: UserProfile) => {
-              const prevUser = map.get(u.uid);
-              const password =
-                prevUser?.password ||
-                u.password ||
-                getStoredPassword(u.email || '') ||
-                (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
-              map.set(u.uid, {
-                ...prevUser,
-                ...u,
-                password
-              });
-              if (u.email && password) {
-                saveStoredPassword(u.email, password);
-              }
-            });
-            const merged = Array.from(map.values());
-            localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
-            return merged;
-          });
-        }
-      } catch {
-        isServerAvailable = false;
-      }
-    };
-
-    checkServerSync();
+    } catch {}
 
     return () => {
+      if (autoSyncTimer) clearInterval(autoSyncTimer);
       if (unsubscribeFirestore) unsubscribeFirestore();
+      if (channel) channel.close();
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, []);
 
@@ -339,7 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => unsubscribe();
   }, [allUsers]);
 
-  // Strict Login Function: ONLY authorized roster can log in!
+  // Strict Login Function: Live Server Auth + Real-time Cloud Fallback
   const login = async (email: string, pass: string) => {
     setError(null);
     const trimmedEmail = email.trim().toLowerCase();
@@ -349,7 +408,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Please provide both email address and password.');
     }
 
-    // 1. Check if email is in the authorized roster or default roster
+    // 1. LIVE SERVER AUTHENTICATION: Direct real-time check against central database
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.success && data.user) {
+          const liveUser: UserProfile = {
+            ...data.user,
+            password: trimmedPass
+          };
+
+          // Update local memory and cache with server-verified credentials
+          saveStoredPassword(trimmedEmail, trimmedPass);
+          localStorage.setItem('agency_user_uid', liveUser.uid);
+          setCurrentUser(liveUser);
+
+          setAllUsers((prev) => {
+            const updated = [...prev.filter((u) => u.uid !== liveUser.uid && u.email?.toLowerCase() !== trimmedEmail), liveUser];
+            try {
+              localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
+
+          return;
+        }
+      } else if (resp.status === 401) {
+        // Check if admin is using system master key or local override before failing
+        const isMaster = trimmedPass === 'Tahahc2020' || trimmedPass.toLowerCase() === 'tahahc2020';
+        if (!isMaster) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.error || 'Incorrect password. Please verify and try again.');
+        }
+      } else if (resp.status === 403) {
+        const errData = await resp.json().catch(() => ({}));
+        // Only throw if not in local cache or Firestore
+        const localFound = allUsers.find((u) => u.email?.toLowerCase() === trimmedEmail);
+        if (!localFound) {
+          throw new Error(errData.error || 'Access Denied: Unregistered email address.');
+        }
+      }
+    } catch (netErr: any) {
+      if (
+        netErr.message &&
+        (netErr.message.includes('Incorrect password') || netErr.message.includes('Access Denied'))
+      ) {
+        throw netErr;
+      }
+      console.warn('Live server auth check skipped, verifying against local/cloud cache:', netErr);
+    }
+
+    // 2. Check if email is in the authorized roster or default roster (Offline / Fallback mode)
     let matchedUser =
       allUsers.find((u) => u.email && u.email.trim().toLowerCase() === trimmedEmail) ||
       DEFAULT_AUTHORIZED_ROSTER.find((u) => u.email && u.email.trim().toLowerCase() === trimmedEmail);
@@ -379,7 +494,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Strictly enforce: only authorized roster can log in
     if (!matchedUser) {
       throw new Error(
-        `Access Denied: The email "${email.trim()}" is not registered on this device's roster. If an administrator recently added this account, tap "Sync Roster" below to update your device.`
+        `Access Denied: The email "${email.trim()}" is not registered on this system. Please contact the administrator.`
       );
     }
 
@@ -388,7 +503,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Access Denied: Your account has been deactivated by administration.');
     }
 
-    // 2. Validate Password
+    // 3. Validate Password against local vault and recovery keys
     let assignedPassword = (
       matchedUser.password ||
       getStoredPassword(trimmedEmail) ||
@@ -440,9 +555,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!isPasswordMatch) {
-      throw new Error(
-        'Incorrect password. If the administrator recently changed your password, tap "Sync Roster" below to fetch the latest credentials.'
-      );
+      throw new Error('Incorrect password. Please verify and try again.');
     }
 
     // Ensure role is admin if super_admin or if Chahat
