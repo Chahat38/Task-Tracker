@@ -34,8 +34,7 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
   const { tasks, assignTask, updateTaskStatus, approveTask, deleteTask, editTask } = useTasks();
   const { currentUser, allUsers } = useAuth();
 
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isAdmin = currentUser?.role === 'admin' || isSuperAdmin;
+  const isAdmin = currentUser?.role === 'admin';
 
   // Filter state
   const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all');
@@ -62,8 +61,8 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
   // Edit Task modal
   const [editingTask, setEditingTask] = useState<AssignedTask | null>(null);
 
-  // Filtered members list for assigning (excluding Managing Director from receiving employee tasks if desired)
-  const assignableUsers = allUsers.filter((u) => u.status === 'active' && u.role !== 'super_admin');
+  // Filtered members list for assigning
+  const assignableUsers = allUsers.filter((u) => u.status === 'active');
 
   // Submit new assigned task
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -84,9 +83,9 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
         assignedToUid: assignedUser.uid,
         assignedToName: assignedUser.name,
         assignedToDesignation: assignedUser.designation || 'Team Member',
-        assignedByUid: currentUser?.uid || 'user_chahat',
-        assignedByName: currentUser?.name || 'Managing Director',
-        assignedByRole: isSuperAdmin ? 'Managing Director' : 'Operations Lead',
+        assignedByUid: currentUser?.uid || '',
+        assignedByName: currentUser?.name || 'Administrator',
+        assignedByRole: currentUser?.designation || 'Admin',
         priority: taskPriority,
         dueDate: taskDueDate,
         status: 'pending'
@@ -138,7 +137,6 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
 
   // Group tasks by team member
   const membersWithTasks = allUsers.filter((u) => {
-    if (u.role === 'super_admin') return false;
     if (selectedUserFilter !== 'all' && u.uid !== selectedUserFilter) return false;
     return true;
   });
@@ -239,13 +237,11 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
               className="bg-slate-50 border border-slate-200 rounded-lg text-xs py-1.5 px-2.5 text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="all">All Team Members</option>
-              {allUsers
-                .filter((u) => u.role !== 'super_admin')
-                .map((u) => (
-                  <option key={u.uid} value={u.uid}>
-                    {u.name} ({u.designation})
-                  </option>
-                ))}
+              {allUsers.map((u) => (
+                <option key={u.uid} value={u.uid}>
+                  {u.name} ({u.designation})
+                </option>
+              ))}
             </select>
           </div>
 

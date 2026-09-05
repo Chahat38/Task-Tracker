@@ -3,12 +3,12 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyBGr47EeApwcfkSsuZ-uyseOLTSAmaIkqI",
-  authDomain: "progress-tracker-9cdec.firebaseapp.com",
-  projectId: "progress-tracker-9cdec",
-  storageBucket: "progress-tracker-9cdec.firebasestorage.app",
-  messagingSenderId: "963365387128",
-  appId: "1:963365387128:web:bad6e8978633260ff3e68d"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyBGr47EeApwcfkSsuZ-uyseOLTSAmaIkqI",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "progress-tracker-9cdec.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "progress-tracker-9cdec",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "progress-tracker-9cdec.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "963365387128",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:963365387128:web:bad6e8978633260ff3e68d"
 };
 
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);

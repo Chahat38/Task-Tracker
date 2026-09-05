@@ -33,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   if (!currentUser) return null;
 
-  const isAdmin = currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin';
+  const isAdmin = currentUser.role === 'admin';
   const isIntern = currentUser.role === 'intern';
   const canViewTeam = isAdmin;
   const canManageUsers = isAdmin;

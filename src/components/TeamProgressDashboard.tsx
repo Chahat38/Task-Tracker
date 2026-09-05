@@ -119,7 +119,7 @@ export const TeamProgressDashboard: React.FC = () => {
 
   // Total team members and submissions count for selected date
   const activeTeamMembers = useMemo(() => {
-    return allUsers.filter((u) => u.status === 'active' && u.role !== 'super_admin');
+    return allUsers.filter((u) => u.status === 'active');
   }, [allUsers]);
 
   const targetDateForStats = dateFilterMode === 'yesterday' ? yesterdayStr : todayStr;
@@ -339,7 +339,7 @@ export const TeamProgressDashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Col 2: Role (RoleBadge hides for Maham, Remsha, Shawal, and super_admin!) */}
+                    {/* Col 2: Role (RoleBadge hides for Maham, Remsha, Shawal) */}
                     <div className="lg:col-span-1 flex items-center">
                       <RoleBadge
                         name={displayName}

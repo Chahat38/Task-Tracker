@@ -39,7 +39,7 @@ export const UserManagement: React.FC = () => {
     provisionUserDirect,
     deleteUserDirect
   } = useAuth();
-  const isAdmin = currentUser?.role === 'admin' || (currentUser?.role as string) === 'super_admin';
+  const isAdmin = currentUser?.role === 'admin';
 
   const [searchFilter, setSearchFilter] = useState('');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -134,8 +134,8 @@ export const UserManagement: React.FC = () => {
     setEditName(u.name || '');
     setEditEmail(u.email || '');
     setEditDesignation(u.designation || '');
-    setEditRole((u.role as string) === 'super_admin' ? 'admin' : u.role);
-    const existingPass = u.password || getStoredPassword(u.email || '') || (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
+    setEditRole(u.role);
+    const existingPass = u.password || getStoredPassword(u.email || '') || 'agency2026';
     setEditPassword(existingPass);
     setEditError(null);
     setShowEditPassword(false);
@@ -163,6 +163,15 @@ export const UserManagement: React.FC = () => {
     if (!trimmedPassword) {
       setEditError('Password cannot be empty.');
       return;
+    }
+
+    // Check if promoting to admin would exceed the 3 admin accounts limit
+    if (editRole === 'admin' && editingUser.role !== 'admin') {
+      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
+      if (currentAdminCount >= 3) {
+        setEditError('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be promoted.');
+        return;
+      }
     }
 
     // Check if new email is already taken by another user
@@ -196,8 +205,8 @@ export const UserManagement: React.FC = () => {
 
   // Delete User
   const handleDeleteUser = async (u: UserProfile) => {
-    const adminCount = allUsers.filter(user => user.role === 'admin' || (user.role as string) === 'super_admin').length;
-    if ((u.role === 'admin' || (u.role as string) === 'super_admin') && adminCount <= 1) {
+    const adminCount = allUsers.filter(user => user.role === 'admin').length;
+    if (u.role === 'admin' && adminCount <= 1) {
       alert('Cannot delete the only remaining Admin account in the system.');
       return;
     }
@@ -237,6 +246,15 @@ export const UserManagement: React.FC = () => {
     if (trimmedPassword.length < 4) {
       setAddError('Password must be at least 4 characters long.');
       return;
+    }
+
+    // Check 3-admin limit
+    if (newRole === 'admin') {
+      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
+      if (currentAdminCount >= 3) {
+        setAddError('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be created.');
+        return;
+      }
     }
 
     // Check duplicate email
@@ -517,7 +535,7 @@ export const UserManagement: React.FC = () => {
                 ) : (
                   activeUsers.map((u) => {
                     const isPasswordShown = !!visiblePasswords[u.uid];
-                    const effectivePassword = u.password || getStoredPassword(u.email || '') || (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
+                    const effectivePassword = u.password || getStoredPassword(u.email || '') || 'agency2026';
 
                     return (
                       <tr key={u.uid} className="hover:bg-slate-50/70 transition-colors">
@@ -933,7 +951,7 @@ export const UserManagement: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">System Security Key</h3>
-                    <p className="text-xs text-slate-500">Administrator master recovery credential (Tahahc2020).</p>
+                    <p className="text-xs text-slate-500">Administrator master recovery credential (Tahahc26).</p>
                   </div>
                 </div>
                 <button

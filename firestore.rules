@@ -1,21 +1,55 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permissive rules allowing seamless offline-first and client-sync operations
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        request.auth.token.email in [
+          'chahathassanain@gmail.com',
+          'saeed.digital.seo@gmail.com',
+          'fatimahuma.english@gmail.com'
+        ]
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users Collection
     match /users/{userId} {
-      allow read, write: if true;
+      // Authenticated users or active profiles
+      allow read: if isAuthenticated() || (resource != null && resource.data.status == 'active');
+      
+      // Admins can manage all users; members can update non-role fields on own profile
+      allow create: if isAdmin() || isAuthenticated();
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
     }
 
+    // Daily Progress Entries
     match /progress_entries/{entryId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
     }
 
+    // Assigned Tasks / Accountability
     match /assigned_tasks/{taskId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
 
+    // Default deny all other documents
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }

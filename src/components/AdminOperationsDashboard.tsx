@@ -102,13 +102,13 @@ export const AdminOperationsDashboard: React.FC<AdminOperationsDashboardProps> =
 
   // Who has submitted today vs who hasn't
   const operationalSubmissions = useMemo(() => {
-    const activeNonMD = allUsers.filter(u => u.status === 'active' && u.role !== 'super_admin');
+    const activeMembers = allUsers.filter(u => u.status === 'active');
     const submittedUserIds = new Set(entries.filter(e => e.date === todayStr).map(e => e.userId));
 
-    const submitted = activeNonMD.filter(u => submittedUserIds.has(u.uid));
-    const pending = activeNonMD.filter(u => !submittedUserIds.has(u.uid));
+    const submitted = activeMembers.filter(u => submittedUserIds.has(u.uid));
+    const pending = activeMembers.filter(u => !submittedUserIds.has(u.uid));
 
-    return { submitted, pending, total: activeNonMD.length };
+    return { submitted, pending, total: activeMembers.length };
   }, [allUsers, entries, todayStr]);
 
   // Copy standup summary

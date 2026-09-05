@@ -30,21 +30,21 @@ const RECOVERY_FILE = path.join(DATA_DIR, 'recovery.json');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
 
 // Default initial recovery key (hashed with SHA-256)
-// System recovery key: "Tahahc2020"
+// System recovery key: "Tahahc26"
 const DEFAULT_KEY_SALT = "AGENCY_RECOVERY_SALT_V1";
-const SYSTEM_KEY = "Tahahc2020";
+const SYSTEM_KEY = "Tahahc26";
 function hashRecoveryCode(code: string): string {
   return crypto.createHash('sha256').update(code.trim() + DEFAULT_KEY_SALT).digest('hex');
 }
 
-// Initialize recovery settings with Tahahc2020 hash
+// Initialize recovery settings with Tahahc26 hash
 let recoverySettings: { hash: string; lastUpdatedAt: string; updatedBy?: string } = {
   hash: hashRecoveryCode(SYSTEM_KEY),
   lastUpdatedAt: new Date().toISOString(),
-  updatedBy: "System (Tahahc2020)"
+  updatedBy: "System (Tahahc26)"
 };
 
-// Always ensure the hashed recovery key is updated to "Tahahc2020" as requested
+// Always ensure the hashed recovery key is updated to "Tahahc26" as requested
 try {
   fs.writeFileSync(RECOVERY_FILE, JSON.stringify(recoverySettings, null, 2));
 } catch (e) {
@@ -122,7 +122,7 @@ const DEFAULT_FOUNDING_PROFILES = [
   {
     uid: 'user_saeed',
     name: 'M. Saeed',
-    designation: 'Head of SEO / Admin',
+    designation: 'CEO',
     email: 'saeed.digital.seo@gmail.com',
     role: 'admin',
     status: 'active',
@@ -185,7 +185,7 @@ const DEFAULT_FOUNDING_PROFILES = [
 ];
 
 const DEFAULT_CREDENTIALS: Record<string, string> = {
-  'chahathassanain@gmail.com': 'Tahahc2020',
+  'chahathassanain@gmail.com': 'Tahahc26',
   'saeed.digital.seo@gmail.com': 'agency2026',
   'fatimahuma.english@gmail.com': 'agency2026',
   'mahamnoor.digital@gmail.com': 'agency2026',
@@ -210,7 +210,7 @@ function seedDefaultUsers() {
 
   // Automatic migration of old legacy emails to new official emails
   const LEGACY_EMAIL_MIGRATIONS: Record<string, { newEmail: string; name: string; designation: string; role: string }> = {
-    'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'M. Saeed', designation: 'Head of SEO / Admin', role: 'admin' },
+    'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'M. Saeed', designation: 'CEO', role: 'admin' },
     'fatima@agency.com': { newEmail: 'fatimahuma.english@gmail.com', name: 'Fatima Huma', designation: 'Senior Editor / Admin', role: 'admin' },
     'maham@agency.com': { newEmail: 'mahamnoor.digital@gmail.com', name: 'Maham Noor', designation: 'Content Creator Head', role: 'member' },
     'remsha@agency.com': { newEmail: 'bangashremsha0@gmail.com', name: 'Remsha', designation: 'Social Media Head', role: 'member' },
@@ -262,28 +262,10 @@ function seedDefaultUsers() {
         existing.designation = profile.designation;
         modified = true;
       }
-      if (existing.role === 'super_admin') {
-        existing.role = 'admin';
-        modified = true;
-      }
       if (profile.role === 'admin' && existing.role !== 'admin') {
         existing.role = 'admin';
         modified = true;
       }
-      if (profile.email === 'chahathassanain@gmail.com') {
-        existing.role = 'admin';
-        existing.status = 'active';
-        existing.designation = 'Managing Director';
-        modified = true;
-      }
-    }
-  }
-
-  // Also migrate all existing users in store with super_admin to admin
-  for (const user of Object.values(store.users) as any[]) {
-    if (user.role === 'super_admin') {
-      user.role = 'admin';
-      modified = true;
     }
   }
 
@@ -304,33 +286,29 @@ app.get('/api/health', (req, res) => {
 
 // Direct Admin recovery access using recovery key
 app.post(['/api/auth/super-admin-recovery', '/api/auth/admin-recovery'], (req, res) => {
-  const { recoveryKey } = req.body;
+  const { recoveryKey, email } = req.body || {};
   if (!recoveryKey || !verifyRecoveryCode(recoveryKey)) {
     return res.status(401).json({ success: false, error: 'Invalid secret recovery key.' });
   }
 
-  let chahat = Object.values(store.users).find(
-    (u: any) => u.email?.toLowerCase() === 'chahathassanain@gmail.com'
-  );
+  let adminUser: any = null;
+  if (email && typeof email === 'string') {
+    adminUser = Object.values(store.users).find(
+      (u: any) => u.email?.toLowerCase() === email.toLowerCase().trim()
+    );
+  }
+  if (!adminUser || adminUser.role !== 'admin') {
+    adminUser = Object.values(store.users).find((u: any) => u.role === 'admin');
+  }
 
-  if (!chahat) {
-    chahat = {
-      uid: 'user_chahat',
-      name: 'Chahat',
-      designation: 'Managing Director',
-      email: 'chahathassanain@gmail.com',
-      role: 'admin',
-      status: 'active',
-      createdAt: new Date().toISOString()
-    };
-    store.users[chahat.uid] = chahat;
-    saveStore();
+  if (!adminUser) {
+    return res.status(404).json({ success: false, error: 'No admin account found in system.' });
   }
 
   return res.json({
     success: true,
     message: 'Credentials verified successfully via Recovery Key.',
-    user: chahat
+    user: adminUser
   });
 });
 
@@ -350,35 +328,16 @@ app.post(['/api/auth/login', '/api/auth/login/'], (req, res) => {
   }
 
   const normalizedEmail = email.toLowerCase().trim();
-  const isChahat = normalizedEmail === 'chahathassanain@gmail.com';
 
   // Find user in provisioned store
-  let user = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === normalizedEmail);
+  const user = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === normalizedEmail);
 
-  // STRICT ACCESS CONTROL: If email is not provisioned and not Chahat, REJECT!
-  if (!user && !isChahat) {
+  // STRICT ACCESS CONTROL: If email is not registered in store, reject
+  if (!user) {
     return res.status(403).json({
       success: false,
       error: 'Access Denied: Unregistered email address. Accounts are provisioned exclusively by agency administration.'
     });
-  }
-
-  // Ensure Chahat exists
-  if (!user && isChahat) {
-    user = {
-      uid: 'user_chahat',
-      name: 'Chahat',
-      designation: 'Managing Director',
-      email: 'chahathassanain@gmail.com',
-      role: 'admin',
-      status: 'active',
-      createdAt: new Date().toISOString()
-    };
-    store.users[user.uid] = user;
-    if (!store.credentials[normalizedEmail]) {
-      store.credentials[normalizedEmail] = 'Tahahc2020';
-    }
-    saveStore();
   }
 
   // Check account status
@@ -389,11 +348,11 @@ app.post(['/api/auth/login', '/api/auth/login/'], (req, res) => {
     });
   }
 
-  // 1. Check if password is the Secret Recovery Code (Tahahc2020)
+  // 1. Check if password is the Secret Recovery Code (Tahahc26)
   const isRecoveryKey = verifyRecoveryCode(password);
 
   // 2. Check provisioned password in credentials store or user record
-  const assignedPassword = store.credentials[normalizedEmail] || (user && user.password);
+  const assignedPassword = store.credentials[normalizedEmail] || user.password;
 
   // 3. Check if password matches a reset password recorded via recovery reset
   const expectedResetHash = store.resetPasswords[normalizedEmail];
@@ -401,7 +360,7 @@ app.post(['/api/auth/login', '/api/auth/login/'], (req, res) => {
   const isResetPasswordMatch = Boolean(expectedResetHash && expectedResetHash === inputPasswordHash);
 
   let isAuthorized = false;
-  // Admin accounts can use the Master Recovery Key (Tahahc2020)
+  // All 3 equal admin accounts can authenticate with the Master Recovery Key (Tahahc26)
   if (user.role === 'admin' && isRecoveryKey) {
     isAuthorized = true;
   } else if (assignedPassword && (assignedPassword === password || assignedPassword.trim().toLowerCase() === password.trim().toLowerCase())) {
@@ -417,19 +376,6 @@ app.post(['/api/auth/login', '/api/auth/login/'], (req, res) => {
     });
   }
 
-  // Ensure equal admin role for Chahat and management
-  if (isChahat) {
-    user.role = 'admin';
-    user.status = 'active';
-    user.designation = 'Managing Director';
-    store.users[user.uid] = user;
-    saveStore();
-  } else if (user.role === 'super_admin') {
-    user.role = 'admin';
-    store.users[user.uid] = user;
-    saveStore();
-  }
-
   // Sanitize user output
   const safeUser = { ...user };
   delete safeUser.password;
@@ -440,6 +386,39 @@ app.post(['/api/auth/login', '/api/auth/login/'], (req, res) => {
     user: safeUser
   });
 });
+
+// Role-based Access Control Middleware for /api/admin/* endpoints
+function verifyAdminAccess(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
+  const adminEmailHeader = req.headers['x-admin-email'];
+  const adminEmail = (typeof adminEmailHeader === 'string' ? adminEmailHeader : req.body?.adminEmail || '').toLowerCase().trim();
+  const recoveryKeyHeader = req.headers['x-recovery-key'];
+  const recoveryKey = (typeof recoveryKeyHeader === 'string' ? recoveryKeyHeader : req.body?.recoveryKey || '').trim();
+
+  // Allow if valid recovery key is provided
+  if (recoveryKey && verifyRecoveryCode(recoveryKey)) {
+    return next();
+  }
+
+  // Verify that the caller is an active administrator in master store
+  if (adminEmail) {
+    const caller = Object.values(store.users).find(
+      (u: any) => u.email?.toLowerCase().trim() === adminEmail
+    );
+    if (caller && caller.role === 'admin' && caller.status === 'active') {
+      return next();
+    }
+  }
+
+  return res.status(403).json({
+    error: 'Access Denied: Administrative privileges required. Only verified admins can perform this action.'
+  });
+}
+
+app.use('/api/admin/*', verifyAdminAccess);
 
 // Admin endpoint: Provision new user with Email and Password
 app.post('/api/admin/provision-user', (req, res) => {
@@ -454,6 +433,16 @@ app.post('/api/admin/provision-user', (req, res) => {
   const existing = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === normEmail);
   if (existing) {
     return res.status(400).json({ error: 'An account with this email address already exists.' });
+  }
+
+  // Enforce 3-admin limit: Only exactly 3 admins are permitted in the system
+  if (role === 'admin') {
+    const currentAdminCount = Object.values(store.users).filter((u: any) => u.role === 'admin').length;
+    if (currentAdminCount >= 3) {
+      return res.status(400).json({
+        error: 'Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be created.'
+      });
+    }
   }
 
   const uid = req.body.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -491,16 +480,36 @@ app.post('/api/admin/update-credentials', (req, res) => {
   if (!currentUser) {
     // If not found, upsert user
     const targetUid = uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    
+    if (role === 'admin') {
+      const currentAdminCount = Object.values(store.users).filter((u: any) => u.role === 'admin').length;
+      if (currentAdminCount >= 3) {
+        return res.status(400).json({
+          error: 'Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be created.'
+        });
+      }
+    }
+
     currentUser = {
       uid: targetUid,
       name: name?.trim() || 'Team Member',
       email: (email || '').toLowerCase().trim(),
       designation: designation?.trim() || 'Team Member',
-      role: role === 'super_admin' ? 'admin' : (role || 'member'),
+      role: role || 'member',
       status: status || 'active',
       createdAt: new Date().toISOString()
     };
     store.users[targetUid] = currentUser;
+  } else {
+    // If promoting to admin, enforce 3-admin limit
+    if (role === 'admin' && currentUser.role !== 'admin') {
+      const currentAdminCount = Object.values(store.users).filter((u: any) => u.role === 'admin').length;
+      if (currentAdminCount >= 3) {
+        return res.status(400).json({
+          error: 'Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be promoted.'
+        });
+      }
+    }
   }
 
   const oldEmail = (currentUser.email || '').toLowerCase().trim();
@@ -508,7 +517,7 @@ app.post('/api/admin/update-credentials', (req, res) => {
 
   if (name) currentUser.name = name.trim();
   if (designation) currentUser.designation = designation.trim();
-  if (role) currentUser.role = role === 'super_admin' ? 'admin' : role;
+  if (role) currentUser.role = role;
   if (status) currentUser.status = status;
   currentUser.updatedAt = new Date().toISOString();
 
@@ -556,7 +565,7 @@ app.post('/api/sync/roster-bulk', (req, res) => {
       name: u.name || existing?.name || 'Team Member',
       email: normEmail,
       designation: u.designation || existing?.designation || 'Team Member',
-      role: u.role === 'super_admin' ? 'admin' : (u.role || existing?.role || 'member'),
+      role: u.role || existing?.role || 'member',
       status: u.status || existing?.status || 'active',
       createdAt: u.createdAt || existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()

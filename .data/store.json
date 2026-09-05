@@ -12,7 +12,7 @@
     "user_saeed": {
       "uid": "user_saeed",
       "name": "M. Saeed",
-      "designation": "Head of SEO / Admin",
+      "designation": "CEO",
       "email": "saeed.digital.seo@gmail.com",
       "role": "admin",
       "status": "active",
@@ -84,14 +84,19 @@
   ],
   "resetPasswords": {},
   "credentials": {
-    "chahathassanain@gmail.com": "Tahahc2020",
+    "chahathassanain@gmail.com": "Tahahc26",
     "saeed.digital.seo@gmail.com": "agency2026",
     "fatimahuma.english@gmail.com": "agency2026",
     "mahamnoor.digital@gmail.com": "agency2026",
     "bangashremsha0@gmail.com": "agency2026",
     "shawalmanzoor865@gmail.com": "agency2026",
     "bq76239@gmail.com": "agency2026",
-    "nehashaah45@gmail.com": "agency2026"
+    "nehashaah45@gmail.com": "agency2026",
+    "saeed@agency.com": "agency2026",
+    "fatima@agency.com": "agency2026",
+    "maham@agency.com": "agency2026",
+    "remsha@agency.com": "agency2026",
+    "shawal@agency.com": "agency2026"
   },
   "tasks": []
 }

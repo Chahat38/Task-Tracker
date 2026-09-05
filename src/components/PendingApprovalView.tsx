@@ -13,7 +13,7 @@ export const PendingApprovalView: React.FC = () => {
     setMessage(null);
     try {
       await refreshUsers();
-      setMessage('Status re-checked. If recently approved by Chahat, your access will unlock momentarily.');
+      setMessage('Status re-checked. If recently approved by an Administrator, your access will unlock momentarily.');
     } catch {
       setMessage('Checked status.');
     } finally {
@@ -63,7 +63,7 @@ export const PendingApprovalView: React.FC = () => {
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-left space-y-2 text-xs text-slate-600">
             <div className="flex items-start space-x-2">
               <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-              <span>Only the Managing Director (Chahat) has administrative approval authorization.</span>
+              <span>Workspace Administrators have administrative approval authorization.</span>
             </div>
             <div className="flex items-start space-x-2">
               <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />

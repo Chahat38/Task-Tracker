@@ -51,7 +51,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
   if (!isOpen || !currentUser) return null;
 
-  const isAdmin = currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin';
+  const isAdmin = currentUser.role === 'admin';
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

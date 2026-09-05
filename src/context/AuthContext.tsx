@@ -50,7 +50,7 @@ const LOCAL_ROSTER_KEY = 'agency_authorized_roster_v4';
 const CREDENTIALS_VAULT_KEY = 'agency_credentials_vault_v2';
 
 const DEFAULT_CREDENTIALS: Record<string, string> = {
-  'chahathassanain@gmail.com': 'Tahahc2020',
+  'chahathassanain@gmail.com': 'Tahahc26',
   'saeed.digital.seo@gmail.com': 'agency2026',
   'fatimahuma.english@gmail.com': 'agency2026',
   'mahamnoor.digital@gmail.com': 'agency2026',
@@ -103,13 +103,13 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
     email: 'chahathassanain@gmail.com',
     role: 'admin',
     status: 'active',
-    password: 'Tahahc2020',
+    password: 'Tahahc26',
     createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_saeed',
     name: 'M. Saeed',
-    designation: 'Head of SEO / Admin',
+    designation: 'CEO',
     email: 'saeed.digital.seo@gmail.com',
     role: 'admin',
     status: 'active',
@@ -179,7 +179,7 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
 ];
 
 const LEGACY_EMAIL_MIGRATIONS: Record<string, { newEmail: string; name: string; designation: string; role: UserRole }> = {
-  'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'M. Saeed', designation: 'Head of SEO / Admin', role: 'admin' },
+  'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'M. Saeed', designation: 'CEO', role: 'admin' },
   'fatima@agency.com': { newEmail: 'fatimahuma.english@gmail.com', name: 'Fatima Huma', designation: 'Senior Editor / Admin', role: 'admin' },
   'maham@agency.com': { newEmail: 'mahamnoor.digital@gmail.com', name: 'Maham Noor', designation: 'Content Creator Head', role: 'member' },
   'remsha@agency.com': { newEmail: 'bangashremsha0@gmail.com', name: 'Remsha', designation: 'Social Media Head', role: 'member' },
@@ -205,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const finalEmail = mig ? mig.newEmail : rawEmail;
             const finalName = mig ? mig.name : u.name;
             const finalDesignation = mig ? mig.designation : u.designation;
-            const finalRole = mig ? mig.role : ((u.role as string) === 'super_admin' ? 'admin' : u.role);
+            const finalRole = mig ? mig.role : u.role;
 
             const def = DEFAULT_AUTHORIZED_ROSTER.find((d) => d.uid === u.uid || d.email.toLowerCase() === finalEmail);
             const password = u.password || getStoredPassword(finalEmail) || def?.password || 'agency2026';
@@ -304,7 +304,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 serverPass ||
                 prevUser?.password ||
                 getStoredPassword(u.email || '') ||
-                (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
+                'agency2026';
 
               map.set(u.uid, {
                 ...prevUser,
@@ -381,7 +381,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   u.password ||
                   prevUser?.password ||
                   getStoredPassword(u.email || '') ||
-                  (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
+                  'agency2026';
                 map.set(u.uid, {
                   ...prevUser,
                   ...u,
@@ -486,7 +486,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else if (resp.status === 401) {
         // Check if admin is using system master key or local override before failing
-        const isMaster = trimmedPass === 'Tahahc2020' || trimmedPass.toLowerCase() === 'tahahc2020';
+        const isMaster = trimmedPass === 'Tahahc26' || trimmedPass.toLowerCase() === 'tahahc26';
         if (!isMaster) {
           const errData = await resp.json().catch(() => ({}));
           throw new Error(errData.error || 'Incorrect password. Please verify and try again.');
@@ -552,30 +552,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let assignedPassword = (
       matchedUser.password ||
       getStoredPassword(trimmedEmail) ||
-      (trimmedEmail === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026')
+      'agency2026'
     ).trim();
 
-    const isChahat = trimmedEmail === 'chahathassanain@gmail.com';
-    const isAdminUser = matchedUser.role === 'admin' || (matchedUser.role as string) === 'super_admin' || isChahat;
+    const isAdminUser = matchedUser.role === 'admin';
 
     const isMasterRecoveryKey =
       isAdminUser &&
-      (trimmedPass === 'Tahahc2020' ||
-        trimmedPass.toLowerCase() === 'tahahc2020' ||
-        trimmedPass === 'COFOUNDER-AGENCY-2026');
-
-    // Chahat (Managing Director) can log in with Tahahc2020, agency2026, or custom password
-    const isChahatMatch =
-      isChahat &&
-      (trimmedPass.toLowerCase() === 'tahahc2020' ||
-        trimmedPass.toLowerCase() === 'agency2026' ||
+      (trimmedPass === 'Tahahc26' ||
+        trimmedPass.toLowerCase() === 'tahahc26' ||
         trimmedPass === 'COFOUNDER-AGENCY-2026');
 
     let isPasswordMatch =
       trimmedPass === assignedPassword ||
       trimmedPass.toLowerCase() === assignedPassword.toLowerCase() ||
-      isMasterRecoveryKey ||
-      isChahatMatch;
+      isMasterRecoveryKey;
 
     // If local password does not match, attempt checking cloud Firestore for updated password
     if (!isPasswordMatch && matchedUser.uid) {
@@ -603,11 +594,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Incorrect password. Please verify and try again.');
     }
 
-    // Ensure role is admin if super_admin or if Chahat
-    if (isChahat || (matchedUser.role as string) === 'super_admin') {
-      matchedUser = { ...matchedUser, role: 'admin' };
-    }
-
     // Successful login: persist user credentials and session
     if (matchedUser.email && trimmedPass && !isMasterRecoveryKey) {
       saveStoredPassword(matchedUser.email, trimmedPass);
@@ -622,13 +608,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const keyLower = trimmedKey.toLowerCase();
 
     if (
-      trimmedKey === 'Tahahc2020' ||
-      keyLower === 'tahahc2020' ||
+      trimmedKey === 'Tahahc26' ||
+      keyLower === 'tahahc26' ||
       trimmedKey === 'COFOUNDER-AGENCY-2026'
     ) {
       const adminUser =
-        allUsers.find((u) => u.email?.toLowerCase() === 'chahathassanain@gmail.com') ||
-        allUsers.find((u) => u.role === 'admin' || (u.role as string) === 'super_admin') ||
+        (email ? allUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase()) : null) ||
+        allUsers.find((u) => u.role === 'admin') ||
         DEFAULT_AUTHORIZED_ROSTER[0];
       const normalizedUser = { ...adminUser, role: 'admin' as const };
       localStorage.setItem('agency_user_uid', normalizedUser.uid);
@@ -666,8 +652,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPasswordByRecoveryCode = async (email: string, code: string, newPass: string) => {
     const trimmedCode = code.trim();
     const isMasterCode =
-      trimmedCode === 'Tahahc2020' ||
-      trimmedCode.toLowerCase() === 'tahahc2020' ||
+      trimmedCode === 'Tahahc26' ||
+      trimmedCode.toLowerCase() === 'tahahc26' ||
       trimmedCode === 'COFOUNDER-AGENCY-2026';
 
     const normEmail = email.trim().toLowerCase();
@@ -694,6 +680,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
     const targetUser = allUsers.find((u) => u.uid === uid);
+
+    if (updates.role === 'admin' && targetUser && targetUser.role !== 'admin') {
+      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
+      if (currentAdminCount >= 3) {
+        throw new Error('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be promoted.');
+      }
+    }
+
     const finalEmail = (updates.email || targetUser?.email || currentUser?.email || '').trim().toLowerCase();
     const finalPassword = (updates.password || targetUser?.password || currentUser?.password || '').trim();
 
@@ -702,7 +696,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: finalEmail || updates.email,
       password: finalPassword || updates.password,
       updatedAt: new Date().toISOString(),
-      updatedBy: currentUser?.name || currentUser?.email || 'Managing Director'
+      updatedBy: currentUser?.name || currentUser?.email || 'Admin'
     };
 
     const updatedRoster = allUsers.map((u) => (u.uid === uid ? { ...u, ...updatedData } : u));
@@ -724,7 +718,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await fetch('/api/admin/update-credentials', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-email': currentUser?.email || ''
+        },
         body: JSON.stringify({
           uid,
           name: updatedData.name,
@@ -746,8 +743,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Direct provision by Managing Director
+  // Direct provision by Administrator
   const provisionUserDirect = async (user: Partial<UserProfile> & { password?: string }) => {
+    if (user.role === 'admin') {
+      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
+      if (currentAdminCount >= 3) {
+        throw new Error('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be created.');
+      }
+    }
+
     const uid = user.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const finalEmail = user.email?.trim().toLowerCase() || '';
     const finalPassword = user.password?.trim() || 'agency2026';
@@ -774,7 +778,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await fetch('/api/admin/provision-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-email': currentUser?.email || ''
+        },
         body: JSON.stringify({
           uid,
           name: newProfile.name,
@@ -795,7 +802,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Direct delete by Managing Director
+  // Direct delete by Administrator
   const deleteUserDirect = async (uid: string) => {
     const target = allUsers.find((u) => u.uid === uid);
     const updated = allUsers.filter((u) => u.uid !== uid);
@@ -804,7 +811,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await fetch('/api/admin/delete-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-email': currentUser?.email || ''
+        },
         body: JSON.stringify({ uid })
       });
     } catch {

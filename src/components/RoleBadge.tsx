@@ -17,7 +17,7 @@ export const RoleBadge: React.FC<RoleBadgeProps> = ({
 }) => {
   const label = getRoleBadgeLabel(name, role, designation);
 
-  // If label is null (e.g. Maham, Remsha, Shawal, or super_admin), render nothing!
+  // If label is null (e.g. Maham, Remsha, Shawal), render nothing!
   if (!label) {
     return null;
   }

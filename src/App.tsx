@@ -32,28 +32,26 @@ function AppContent() {
       const requested = hash || path;
 
       if (requested === 'approvals') {
-        // STRICT REDIRECT: Only super_admin can access the approvals route
-        if (currentUser.role === 'super_admin') {
+        if (currentUser.role === 'admin') {
           setCurrentTab('approvals');
         } else {
           // Immediately redirect unauthorized attempts
-          const fallbackTab: AppTab = currentUser.role === 'admin' ? 'team' : 'personal';
-          window.location.hash = `#${fallbackTab}`;
+          window.location.hash = '#personal';
           if (window.location.pathname !== '/') {
-            window.history.replaceState(null, '', `/#${fallbackTab}`);
+            window.history.replaceState(null, '', '/#personal');
           }
-          setCurrentTab(fallbackTab);
+          setCurrentTab('personal');
         }
-      } else if (requested === 'users' && (currentUser.role === 'admin' || currentUser.role === 'super_admin')) {
+      } else if (requested === 'users' && currentUser.role === 'admin') {
         setCurrentTab('users');
-      } else if (requested === 'team' && (currentUser.role === 'admin' || currentUser.role === 'super_admin')) {
+      } else if (requested === 'team' && currentUser.role === 'admin') {
         setCurrentTab('team');
-      } else if (requested === 'personal' && currentUser.role !== 'super_admin') {
+      } else if (requested === 'personal') {
         setCurrentTab('personal');
       } else {
         // Set default based on role if no hash
         if (!hash) {
-          if (currentUser.role === 'super_admin' || currentUser.role === 'admin') {
+          if (currentUser.role === 'admin') {
             setCurrentTab('team');
           } else {
             setCurrentTab('personal');
@@ -74,10 +72,9 @@ function AppContent() {
 
   const handleTabChange = (tab: AppTab) => {
     // Route guard on tab change
-    if (tab === 'approvals' && currentUser?.role !== 'super_admin') {
-      const fallbackTab: AppTab = currentUser?.role === 'admin' ? 'team' : 'personal';
-      window.location.hash = `#${fallbackTab}`;
-      setCurrentTab(fallbackTab);
+    if ((tab === 'approvals' || tab === 'users' || tab === 'team') && currentUser?.role !== 'admin') {
+      window.location.hash = '#personal';
+      setCurrentTab('personal');
       return;
     }
     window.location.hash = `#${tab}`;
@@ -122,16 +119,16 @@ function AppContent() {
         {currentTab === 'personal' && (
           <PersonalDashboard />
         )}
-        {currentTab === 'team' && (currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin') && (
+        {currentTab === 'team' && currentUser.role === 'admin' && (
           <ExecutiveDashboard
             onNavigateToUsers={() => handleTabChange('users')}
             onNavigateToApprovals={() => handleTabChange('approvals')}
           />
         )}
-        {currentTab === 'users' && (currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin') && (
+        {currentTab === 'users' && currentUser.role === 'admin' && (
           <UserManagement />
         )}
-        {currentTab === 'approvals' && (currentUser.role === 'admin' || (currentUser.role as string) === 'super_admin') && (
+        {currentTab === 'approvals' && currentUser.role === 'admin' && (
           <PendingApprovalsPage onRedirectToTeam={() => handleTabChange('team')} />
         )}
       </div>

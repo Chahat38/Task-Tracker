@@ -24,7 +24,6 @@ export function isSpecialNoRoleMember(name?: string, designation?: string): bool
 /**
  * Returns role display label, or null if the role label must NOT be shown.
  * - Maham, Remsha, Shawal: returns null (NO role tag at all)
- * - super_admin: returns null (never expose super_admin as user-facing label/dropdown)
  * - admin: returns "Admin"
  * - member: returns "Member"
  * - intern: returns "Intern"
@@ -33,7 +32,7 @@ export function getRoleBadgeLabel(name: string, role: UserRole, designation?: st
   if (isSpecialNoRoleMember(name, designation)) {
     return null;
   }
-  if (role === 'admin' || role === 'super_admin') {
+  if (role === 'admin') {
     return 'Admin';
   }
   if (role === 'member') {
@@ -51,7 +50,6 @@ export function getRoleBadgeLabel(name: string, role: UserRole, designation?: st
 export function getRoleBadgeStyle(role: UserRole): { bg: string; text: string; border: string } {
   switch (role) {
     case 'admin':
-    case 'super_admin' as any:
       return {
         bg: 'bg-amber-100',
         text: 'text-amber-700',

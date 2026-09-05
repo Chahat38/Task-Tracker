@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'member' | 'intern' | 'super_admin';
+export type UserRole = 'admin' | 'member' | 'intern';
 export type UserStatus = 'pending' | 'active' | 'rejected';
 
 export interface TaskItem {
