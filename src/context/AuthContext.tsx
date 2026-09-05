@@ -10,11 +10,14 @@ import {
 import {
   doc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
   deleteDoc,
   collection,
   onSnapshot,
+  query,
+  where,
 } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { UserProfile, UserRole } from '../types';
@@ -35,11 +38,54 @@ interface AuthContextType {
   refreshUsers: () => Promise<void>;
   provisionUserDirect: (user: Partial<UserProfile> & { password?: string }) => Promise<void>;
   deleteUserDirect: (uid: string) => Promise<void>;
+  exportRosterCode: () => string;
+  importRosterCode: (code: string) => Promise<{ success: boolean; count: number; message: string }>;
+  pushRosterToCloud: () => Promise<{ success: boolean; count?: number; message: string }>;
+  pullRosterFromCloud: () => Promise<{ success: boolean; count?: number; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const LOCAL_ROSTER_KEY = 'agency_authorized_roster_v3';
+const CREDENTIALS_VAULT_KEY = 'agency_credentials_vault_v2';
+
+const DEFAULT_CREDENTIALS: Record<string, string> = {
+  'chahathassanain@gmail.com': 'Tahahc2020',
+  'saeed@agency.com': 'agency2026',
+  'fatima@agency.com': 'agency2026',
+  'maham@agency.com': 'agency2026',
+  'remsha@agency.com': 'agency2026',
+  'shawal@agency.com': 'agency2026',
+  'bq76239@gmail.com': 'malaika'
+};
+
+export function getStoredPassword(email: string): string {
+  const norm = email.toLowerCase().trim();
+  try {
+    const raw = localStorage.getItem(CREDENTIALS_VAULT_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && parsed[norm]) {
+        return parsed[norm];
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return DEFAULT_CREDENTIALS[norm] || 'agency2026';
+}
+
+export function saveStoredPassword(email: string, pass: string) {
+  const norm = email.toLowerCase().trim();
+  try {
+    const raw = localStorage.getItem(CREDENTIALS_VAULT_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    parsed[norm] = pass;
+    localStorage.setItem(CREDENTIALS_VAULT_KEY, JSON.stringify(parsed));
+  } catch {
+    // fallback
+  }
+}
 
 // Default authorized roster - all co-founders have equal 'admin' role!
 export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
@@ -96,11 +142,21 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   {
     uid: 'user_shawal',
     name: 'Shawal',
-    designation: 'Graphic Designer',
+    designation: 'Technical Head',
     email: 'shawal@agency.com',
     role: 'member',
     status: 'active',
     password: 'agency2026',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_malaika',
+    name: 'Malaika',
+    designation: 'Team Member',
+    email: 'bq76239@gmail.com',
+    role: 'member',
+    status: 'active',
+    password: 'malaika',
     createdAt: '2026-01-01T00:00:00.000Z'
   }
 ];
@@ -120,11 +176,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           parsed.forEach((u: UserProfile) => {
             const role = (u.role as string) === 'super_admin' ? 'admin' : u.role;
             const def = DEFAULT_AUTHORIZED_ROSTER.find((d) => d.uid === u.uid);
+            const password = u.password || getStoredPassword(u.email || '') || def?.password || 'agency2026';
             map.set(u.uid, {
               ...u,
               role,
-              password: u.password || def?.password || 'Tahahc2020'
+              password
             });
+            if (u.email && password) {
+              saveStoredPassword(u.email, password);
+            }
           });
           return Array.from(map.values());
         }
@@ -138,8 +198,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync users to LocalStorage
+  // Sync users to LocalStorage and ensure credentials vault stays in sync
   const persistRoster = useCallback((roster: UserProfile[]) => {
+    roster.forEach((u) => {
+      if (u.email && u.password) {
+        saveStoredPassword(u.email, u.password);
+      }
+    });
     setAllUsers(roster);
     try {
       localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(roster));
@@ -166,7 +231,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAllUsers((prev) => {
               const map = new Map<string, UserProfile>();
               prev.forEach((u) => map.set(u.uid, u));
-              loaded.forEach((u) => map.set(u.uid, u));
+              loaded.forEach((u) => {
+                const prevUser = map.get(u.uid);
+                const password =
+                  prevUser?.password ||
+                  u.password ||
+                  getStoredPassword(u.email || '') ||
+                  (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
+                map.set(u.uid, {
+                  ...prevUser,
+                  ...u,
+                  password
+                });
+                if (u.email && password) {
+                  saveStoredPassword(u.email, password);
+                }
+              });
               const merged = Array.from(map.values());
               localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
               return merged;
@@ -181,13 +261,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // fallback
     }
 
-    // Single probe check for server sync to avoid spamming 404 errors if static Vercel
+    // Single probe check for server sync to avoid spamming 404/405 errors if static host
     const checkServerSync = async () => {
       if (!isServerAvailable) return;
       try {
         const res = await fetch('/api/sync/users');
         if (!res.ok) {
-          // Server returned 404 or non-200, disable polling
           isServerAvailable = false;
           return;
         }
@@ -196,7 +275,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAllUsers((prev) => {
             const map = new Map<string, UserProfile>();
             prev.forEach((u) => map.set(u.uid, u));
-            data.users.forEach((u: UserProfile) => map.set(u.uid, u));
+            data.users.forEach((u: UserProfile) => {
+              const prevUser = map.get(u.uid);
+              const password =
+                prevUser?.password ||
+                u.password ||
+                getStoredPassword(u.email || '') ||
+                (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
+              map.set(u.uid, {
+                ...prevUser,
+                ...u,
+                password
+              });
+              if (u.email && password) {
+                saveStoredPassword(u.email, password);
+              }
+            });
             const merged = Array.from(map.values());
             localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(merged));
             return merged;
@@ -255,47 +349,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Please provide both email address and password.');
     }
 
-    // 1. Check if email is in the authorized roster
-    let matchedUser = allUsers.find(
-      (u) => u.email && u.email.trim().toLowerCase() === trimmedEmail
-    );
+    // 1. Check if email is in the authorized roster or default roster
+    let matchedUser =
+      allUsers.find((u) => u.email && u.email.trim().toLowerCase() === trimmedEmail) ||
+      DEFAULT_AUTHORIZED_ROSTER.find((u) => u.email && u.email.trim().toLowerCase() === trimmedEmail);
 
-    // If not found in local allUsers, check with server
+    // If not found in memory, attempt a direct Firestore query before failing
     if (!matchedUser) {
       try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
-        });
-        const data = await res.json();
-        if (res.ok && data.success && data.user) {
-          matchedUser = data.user;
+        const usersCol = collection(db, 'users');
+        const q = query(usersCol, where('email', '==', trimmedEmail));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          const docData = snap.docs[0].data() as UserProfile;
+          matchedUser = { ...docData, uid: snap.docs[0].id };
           setAllUsers((prev) => {
-            const updated = [
-              ...prev.filter((u) => u.uid !== data.user.uid && u.email?.toLowerCase() !== trimmedEmail),
-              data.user
-            ];
-            localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(updated));
+            const updated = [...prev.filter((u) => u.uid !== matchedUser!.uid), matchedUser!];
+            try {
+              localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(updated));
+            } catch {}
             return updated;
           });
-          localStorage.setItem('agency_user_uid', data.user.uid);
-          setCurrentUser(data.user);
-          return;
-        } else if (data && data.error) {
-          throw new Error(data.error);
         }
-      } catch (err: any) {
-        if (err.message && (err.message.includes('Access Denied') || err.message.includes('Incorrect password'))) {
-          throw err;
-        }
+      } catch {
+        // quiet fallback
       }
     }
 
     // Strictly enforce: only authorized roster can log in
     if (!matchedUser) {
       throw new Error(
-        `Access Denied: The email "${email.trim()}" is not registered in the system. Only authorized team members added by agency administration can log in.`
+        `Access Denied: The email "${email.trim()}" is not registered on this device's roster. If an administrator recently added this account, tap "Sync Roster" below to update your device.`
       );
     }
 
@@ -305,45 +389,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 2. Validate Password
-    const assignedPassword = (matchedUser.password || '').trim();
-    const isAdminUser = matchedUser.role === 'admin' || (matchedUser.role as string) === 'super_admin';
-    const isMasterRecoveryKey = isAdminUser && (trimmedPass === 'Tahahc2020' || trimmedPass.toLowerCase() === 'tahahc2020');
+    let assignedPassword = (
+      matchedUser.password ||
+      getStoredPassword(trimmedEmail) ||
+      (trimmedEmail === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026')
+    ).trim();
 
-    const isPasswordMatch =
-      (assignedPassword && (trimmedPass === assignedPassword || trimmedPass.toLowerCase() === assignedPassword.toLowerCase())) ||
-      isMasterRecoveryKey;
+    const isChahat = trimmedEmail === 'chahathassanain@gmail.com';
+    const isAdminUser = matchedUser.role === 'admin' || (matchedUser.role as string) === 'super_admin' || isChahat;
 
-    if (!isPasswordMatch) {
-      // Validate with backend in case credentials were reset on server
-      let serverVerified = false;
+    const isMasterRecoveryKey =
+      isAdminUser &&
+      (trimmedPass === 'Tahahc2020' ||
+        trimmedPass.toLowerCase() === 'tahahc2020' ||
+        trimmedPass === 'COFOUNDER-AGENCY-2026');
+
+    // Chahat (Managing Director) can log in with Tahahc2020, agency2026, or custom password
+    const isChahatMatch =
+      isChahat &&
+      (trimmedPass.toLowerCase() === 'tahahc2020' ||
+        trimmedPass.toLowerCase() === 'agency2026' ||
+        trimmedPass === 'COFOUNDER-AGENCY-2026');
+
+    let isPasswordMatch =
+      trimmedPass === assignedPassword ||
+      trimmedPass.toLowerCase() === assignedPassword.toLowerCase() ||
+      isMasterRecoveryKey ||
+      isChahatMatch;
+
+    // If local password does not match, attempt checking cloud Firestore for updated password
+    if (!isPasswordMatch && matchedUser.uid) {
       try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: trimmedEmail, password: trimmedPass })
-        });
-        const data = await res.json();
-        if (res.ok && data.success && data.user) {
-          serverVerified = true;
-          matchedUser = data.user;
+        const userDocRef = doc(db, 'users', matchedUser.uid);
+        const userSnap = await getDoc(userDocRef);
+        if (userSnap.exists()) {
+          const remoteData = userSnap.data() as UserProfile;
+          if (
+            remoteData.password &&
+            (trimmedPass === remoteData.password.trim() ||
+              trimmedPass.toLowerCase() === remoteData.password.trim().toLowerCase())
+          ) {
+            matchedUser = { ...matchedUser, password: remoteData.password.trim() };
+            saveStoredPassword(trimmedEmail, remoteData.password.trim());
+            isPasswordMatch = true;
+          }
         }
       } catch {
-        // silent fallback
-      }
-
-      if (!serverVerified) {
-        throw new Error(
-          'Incorrect password. Please enter the valid password provided for your account.'
-        );
+        // quiet fallback
       }
     }
 
-    // Ensure role is admin if super_admin
-    if ((matchedUser.role as string) === 'super_admin') {
+    if (!isPasswordMatch) {
+      throw new Error(
+        'Incorrect password. If the administrator recently changed your password, tap "Sync Roster" below to fetch the latest credentials.'
+      );
+    }
+
+    // Ensure role is admin if super_admin or if Chahat
+    if (isChahat || (matchedUser.role as string) === 'super_admin') {
       matchedUser = { ...matchedUser, role: 'admin' };
     }
 
-    // Successful login
+    // Successful login: persist user credentials and session
+    if (matchedUser.email && trimmedPass && !isMasterRecoveryKey) {
+      saveStoredPassword(matchedUser.email, trimmedPass);
+    }
     localStorage.setItem('agency_user_uid', matchedUser.uid);
     setCurrentUser(matchedUser);
   };
@@ -358,28 +468,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       keyLower === 'tahahc2020' ||
       trimmedKey === 'COFOUNDER-AGENCY-2026'
     ) {
-      const adminUser = allUsers.find((u) => u.role === 'admin' || (u.role as string) === 'super_admin') || DEFAULT_AUTHORIZED_ROSTER[0];
+      const adminUser =
+        allUsers.find((u) => u.email?.toLowerCase() === 'chahathassanain@gmail.com') ||
+        allUsers.find((u) => u.role === 'admin' || (u.role as string) === 'super_admin') ||
+        DEFAULT_AUTHORIZED_ROSTER[0];
       const normalizedUser = { ...adminUser, role: 'admin' as const };
       localStorage.setItem('agency_user_uid', normalizedUser.uid);
       setCurrentUser(normalizedUser);
       return;
-    }
-
-    try {
-      const res = await fetch('/api/auth/admin-recovery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recoveryKey: trimmedKey, email: email?.trim() })
-      });
-      const data = await res.json();
-      if (res.ok && data.success && data.user) {
-        const normalized = { ...data.user, role: 'admin' };
-        localStorage.setItem('agency_user_uid', normalized.uid);
-        setCurrentUser(normalized);
-        return;
-      }
-    } catch {
-      // ignore
     }
 
     throw new Error('Invalid secret recovery key.');
@@ -411,37 +507,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPasswordByRecoveryCode = async (email: string, code: string, newPass: string) => {
     const trimmedCode = code.trim();
-    if (trimmedCode === 'Tahahc2020' || trimmedCode === 'COFOUNDER-AGENCY-2026') {
-      const user = allUsers.find((u) => u.email?.toLowerCase() === email.trim().toLowerCase());
+    const isMasterCode =
+      trimmedCode === 'Tahahc2020' ||
+      trimmedCode.toLowerCase() === 'tahahc2020' ||
+      trimmedCode === 'COFOUNDER-AGENCY-2026';
+
+    const normEmail = email.trim().toLowerCase();
+
+    if (isMasterCode) {
+      saveStoredPassword(normEmail, newPass.trim());
+      const user = allUsers.find((u) => u.email?.toLowerCase() === normEmail) ||
+        DEFAULT_AUTHORIZED_ROSTER.find((u) => u.email?.toLowerCase() === normEmail);
       if (user) {
-        const updated = allUsers.map((u) => (u.uid === user.uid ? { ...u, password: newPass } : u));
+        const updated = allUsers.map((u) => (u.email?.toLowerCase() === normEmail ? { ...u, password: newPass.trim() } : u));
         persistRoster(updated);
+        // Background sync to Firestore
+        try {
+          updateDoc(doc(db, 'users', user.uid), { password: newPass.trim() }).catch(() => {});
+        } catch {
+          // ignore
+        }
         return { success: true, message: 'Password updated successfully!' };
       }
-    }
-
-    try {
-      const res = await fetch('/api/recovery/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email.trim(),
-          recoveryCode: code.trim(),
-          newPassword: newPass
-        })
-      });
-      const data = await res.json();
-      if (res.ok) return data;
-    } catch {
-      // fallback
     }
 
     throw new Error('Unable to reset password. Please check your recovery code.');
   };
 
   const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
+    const targetUser = allUsers.find((u) => u.uid === uid);
+    const finalEmail = (updates.email || targetUser?.email || currentUser?.email || '').trim().toLowerCase();
+    const finalPassword = (updates.password || targetUser?.password || currentUser?.password || '').trim();
+
     const updatedData = {
       ...updates,
+      email: finalEmail || updates.email,
+      password: finalPassword || updates.password,
       updatedAt: new Date().toISOString(),
       updatedBy: currentUser?.name || currentUser?.email || 'Managing Director'
     };
@@ -449,22 +550,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updatedRoster = allUsers.map((u) => (u.uid === uid ? { ...u, ...updatedData } : u));
     persistRoster(updatedRoster);
 
-    if (currentUser && currentUser.uid === uid) {
+    if (currentUser && (currentUser.uid === uid || (targetUser?.email && currentUser.email?.toLowerCase() === targetUser.email.toLowerCase()))) {
       setCurrentUser((prev) => (prev ? { ...prev, ...updatedData } : null));
     }
 
-    try {
-      await updateDoc(doc(db, 'users', uid), updatedData);
-    } catch {
-      // fallback
+    // Save to password vault for immediate offline & refresh accessibility
+    if (finalEmail && finalPassword) {
+      saveStoredPassword(finalEmail, finalPassword);
+    }
+    if (targetUser?.email && targetUser.email.toLowerCase() !== finalEmail && finalPassword) {
+      saveStoredPassword(targetUser.email.toLowerCase(), finalPassword);
     }
 
+    // Update backend Express server
     try {
       await fetch('/api/admin/update-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid, ...updatedData })
+        body: JSON.stringify({
+          uid,
+          name: updatedData.name,
+          email: finalEmail,
+          designation: updatedData.designation,
+          role: updatedData.role,
+          password: finalPassword,
+          status: updatedData.status
+        })
       });
+    } catch {
+      // quiet fallback
+    }
+
+    try {
+      await setDoc(doc(db, 'users', uid), updatedData, { merge: true });
     } catch {
       // fallback
     }
@@ -473,32 +591,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Direct provision by Managing Director
   const provisionUserDirect = async (user: Partial<UserProfile> & { password?: string }) => {
     const uid = user.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const finalEmail = user.email?.trim().toLowerCase() || '';
+    const finalPassword = user.password?.trim() || 'agency2026';
+
     const newProfile: UserProfile = {
       uid,
       name: user.name?.trim() || 'Team Member',
-      designation: user.designation?.trim() || 'Team Member',
-      email: user.email?.trim().toLowerCase() || '',
+      designation: user.designation?.trim() || (user.role === 'intern' ? 'Intern' : 'Team Member'),
+      email: finalEmail,
       role: user.role || 'member',
       status: 'active',
-      password: user.password?.trim() || 'agency2026',
+      password: finalPassword,
       createdAt: new Date().toISOString()
     };
 
-    const updated = [...allUsers.filter((u) => u.uid !== uid && u.email !== newProfile.email), newProfile];
+    const updated = [...allUsers.filter((u) => u.uid !== uid && u.email !== finalEmail), newProfile];
     persistRoster(updated);
 
-    try {
-      await setDoc(doc(db, 'users', uid), newProfile);
-    } catch {
-      // fallback
+    if (finalEmail && finalPassword) {
+      saveStoredPassword(finalEmail, finalPassword);
     }
 
+    // Call server provision API
     try {
       await fetch('/api/admin/provision-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProfile)
+        body: JSON.stringify({
+          uid,
+          name: newProfile.name,
+          email: finalEmail,
+          designation: newProfile.designation,
+          role: newProfile.role,
+          password: finalPassword
+        })
       });
+    } catch {
+      // quiet fallback
+    }
+
+    try {
+      await setDoc(doc(db, 'users', uid), newProfile);
     } catch {
       // fallback
     }
@@ -506,14 +639,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Direct delete by Managing Director
   const deleteUserDirect = async (uid: string) => {
+    const target = allUsers.find((u) => u.uid === uid);
     const updated = allUsers.filter((u) => u.uid !== uid);
     persistRoster(updated);
-
-    try {
-      await deleteDoc(doc(db, 'users', uid));
-    } catch {
-      // fallback
-    }
 
     try {
       await fetch('/api/admin/delete-user', {
@@ -521,6 +649,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid })
       });
+    } catch {
+      // fallback
+    }
+
+    try {
+      await deleteDoc(doc(db, 'users', uid));
     } catch {
       // fallback
     }
@@ -540,6 +674,163 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const exportRosterCode = useCallback((): string => {
+    try {
+      const exportData = allUsers.map((u) => {
+        const pass =
+          u.password ||
+          getStoredPassword(u.email || '') ||
+          DEFAULT_CREDENTIALS[u.email?.toLowerCase().trim() || ''] ||
+          'agency2026';
+        return {
+          uid: u.uid,
+          name: u.name,
+          designation: u.designation,
+          email: u.email,
+          role: u.role,
+          status: u.status || 'active',
+          password: pass,
+          createdAt: u.createdAt || new Date().toISOString()
+        };
+      });
+      const json = JSON.stringify(exportData);
+      return 'AGENCY_ROSTER_' + btoa(unescape(encodeURIComponent(json)));
+    } catch (e) {
+      console.error('Export roster failed:', e);
+      return '';
+    }
+  }, [allUsers]);
+
+  const importRosterCode = useCallback(
+    async (code: string): Promise<{ success: boolean; count: number; message: string }> => {
+      try {
+        const clean = code.trim();
+        let rawJson = '';
+        if (clean.startsWith('AGENCY_ROSTER_')) {
+          const b64 = clean.replace('AGENCY_ROSTER_', '');
+          rawJson = decodeURIComponent(escape(atob(b64)));
+        } else {
+          rawJson = clean;
+        }
+        const parsed = JSON.parse(rawJson);
+        if (!Array.isArray(parsed) || parsed.length === 0) {
+          return { success: false, count: 0, message: 'Invalid sync code format: no user profiles found.' };
+        }
+
+        const map = new Map<string, UserProfile>();
+        allUsers.forEach((u) => map.set(u.uid, u));
+
+        let importedCount = 0;
+        parsed.forEach((item: any) => {
+          if (item && item.email && item.name) {
+            const uid = item.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+            const email = item.email.trim().toLowerCase();
+            const pass = item.password?.trim() || 'agency2026';
+            const userObj: UserProfile = {
+              uid,
+              name: item.name.trim(),
+              designation: item.designation?.trim() || 'Team Member',
+              email,
+              role: item.role === 'admin' ? 'admin' : item.role === 'intern' ? 'intern' : 'member',
+              status: item.status || 'active',
+              password: pass,
+              createdAt: item.createdAt || new Date().toISOString()
+            };
+            map.set(uid, userObj);
+            saveStoredPassword(email, pass);
+            importedCount++;
+          }
+        });
+
+        const updated = Array.from(map.values());
+        persistRoster(updated);
+        return {
+          success: true,
+          count: importedCount,
+          message: `Successfully synchronized ${importedCount} member accounts and credentials to this device!`
+        };
+      } catch (err: any) {
+        return { success: false, count: 0, message: `Failed to import sync code: ${err.message}` };
+      }
+    },
+    [allUsers, persistRoster]
+  );
+
+  const pushRosterToCloud = useCallback(async (): Promise<{ success: boolean; count?: number; message: string }> => {
+    let successCount = 0;
+    let failedCount = 0;
+    let lastError = '';
+
+    for (const u of allUsers) {
+      try {
+        const pass =
+          u.password ||
+          getStoredPassword(u.email || '') ||
+          DEFAULT_CREDENTIALS[u.email?.toLowerCase().trim() || ''] ||
+          'agency2026';
+        const payload: UserProfile = {
+          ...u,
+          password: pass
+        };
+        await setDoc(doc(db, 'users', u.uid), payload, { merge: true });
+        successCount++;
+      } catch (err: any) {
+        failedCount++;
+        lastError = err.message || 'Permission denied';
+      }
+    }
+
+    if (failedCount > 0 && successCount === 0) {
+      return {
+        success: false,
+        message: `Firebase cloud rejected update (${lastError}). Please make sure Firestore security rules in Firebase Console are set to: allow read, write: if true;`
+      };
+    }
+
+    return {
+      success: true,
+      count: successCount,
+      message: `Successfully pushed ${successCount} member profiles and passwords to Firebase Cloud!`
+    };
+  }, [allUsers]);
+
+  const pullRosterFromCloud = useCallback(async (): Promise<{ success: boolean; count?: number; message: string }> => {
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      if (snap.empty) {
+        return { success: false, count: 0, message: 'Cloud database is empty or has no user documents.' };
+      }
+      const map = new Map<string, UserProfile>();
+      allUsers.forEach((u) => map.set(u.uid, u));
+
+      let count = 0;
+      snap.forEach((d) => {
+        const data = d.data() as UserProfile;
+        const uid = d.id;
+        const pass = data.password || getStoredPassword(data.email || '') || 'agency2026';
+        map.set(uid, { ...data, uid, password: pass });
+        if (data.email) {
+          saveStoredPassword(data.email, pass);
+        }
+        count++;
+      });
+
+      const merged = Array.from(map.values());
+      persistRoster(merged);
+      return {
+        success: true,
+        count,
+        message: `Successfully downloaded ${count} user accounts from cloud database!`
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        count: 0,
+        message: `Could not download from cloud: ${err.message}. Firebase rules may need to be updated in Firebase Console.`
+      };
+    }
+  }, [allUsers, persistRoster]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -557,7 +848,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         allUsers,
         refreshUsers,
         provisionUserDirect,
-        deleteUserDirect
+        deleteUserDirect,
+        exportRosterCode,
+        importRosterCode,
+        pushRosterToCloud,
+        pullRosterFromCloud
       }}
     >
       {children}

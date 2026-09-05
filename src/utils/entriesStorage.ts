@@ -186,20 +186,7 @@ export async function upsertProgressEntry(entry: ProgressEntry): Promise<{
     // ignore
   }
 
-  // 3. Background safe sync to server (Catches 405, 404, or network errors quietly)
-  try {
-    fetch('/api/sync/entries', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(normalizedEntry)
-    }).catch((err) => {
-      console.debug('Server entry background sync notice (handled):', err?.message);
-    });
-  } catch {
-    // safe fallback
-  }
-
-  // 4. Background safe sync to Firestore (Catches adblocker ERR_BLOCKED_BY_CLIENT or permissions quietly)
+  // 3. Background safe sync to Firestore (Catches adblocker ERR_BLOCKED_BY_CLIENT or permissions quietly)
   try {
     setDoc(doc(db, 'progress_entries', finalId), normalizedEntry).catch((err) => {
       console.debug('Firestore background sync notice (handled):', err?.message);

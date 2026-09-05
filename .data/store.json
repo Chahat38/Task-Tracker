@@ -54,6 +54,15 @@
       "role": "member",
       "status": "active",
       "createdAt": "2026-09-04T17:18:33.946Z"
+    },
+    "user_malaika": {
+      "uid": "user_malaika",
+      "name": "Malaika",
+      "designation": "Team Member",
+      "email": "bq76239@gmail.com",
+      "role": "member",
+      "status": "active",
+      "createdAt": "2026-09-05T04:20:00.000Z"
     }
   },
   "entries": [
@@ -90,7 +99,8 @@
     "fatima@agency.com": "agency2026",
     "maham@agency.com": "agency2026",
     "remsha@agency.com": "agency2026",
-    "shawal@agency.com": "agency2026"
+    "shawal@agency.com": "agency2026",
+    "bq76239@gmail.com": "malaika"
   },
   "tasks": []
 }

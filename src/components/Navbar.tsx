@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { RoleBadge } from './RoleBadge';
 import { getInitials } from '../utils/rules';
+import { AccountSettingsModal } from './AccountSettingsModal';
 import {
   FileText,
   Users,
@@ -10,7 +11,9 @@ import {
   ShieldAlert,
   Menu,
   X,
-  CheckSquare
+  CheckSquare,
+  Settings,
+  KeyRound
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -26,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const { currentUser, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   if (!currentUser) return null;
 
@@ -129,22 +133,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* User Profile Footer */}
-        <div className="p-4 border-t border-slate-100">
-          <div className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 transition-colors">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/70 shadow-2xs">
+            <div
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer hover:opacity-80 transition-opacity"
+              title="Click to change your Email and Password"
+            >
+              <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-2xs">
                 {getInitials(currentUser.name)}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-sm font-bold leading-none text-slate-900 truncate">
+                  <p className="text-xs font-bold leading-none text-slate-900 truncate">
                     {currentUser.name}
                   </p>
-                  <RoleBadge
-                    name={currentUser.name}
-                    role={currentUser.role}
-                    designation={currentUser.designation}
-                  />
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-tight font-semibold truncate">
                   {currentUser.designation || 'Team Member'}
@@ -152,16 +155,36 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            <button
-              id="button-logout"
-              type="button"
-              onClick={logout}
-              title="Sign Out"
-              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0 ml-1"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-0.5 shrink-0 ml-1">
+              <button
+                type="button"
+                id="btn-account-settings"
+                onClick={() => setIsSettingsOpen(true)}
+                title="Change Email & Password"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-indigo-500" />
+              </button>
+              <button
+                id="button-logout"
+                type="button"
+                onClick={logout}
+                title="Sign Out"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-full mt-2.5 py-1 px-2 text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50/80 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-indigo-100"
+          >
+            <KeyRound className="w-3 h-3" />
+            <span>Change Email or Password</span>
+          </button>
         </div>
       </aside>
 
@@ -185,8 +208,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            title="Change Email & Password"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer flex items-center gap-1 text-xs font-semibold"
+          >
+            <KeyRound className="w-4 h-4 text-indigo-600" />
+            <span className="hidden sm:inline text-[11px]">Credentials</span>
+          </button>
+          <div
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-7 h-7 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs cursor-pointer"
+            title="Account Settings"
+          >
             {getInitials(currentUser.name)}
           </div>
           <button
@@ -265,8 +301,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setIsSettingsOpen(true);
+            }}
+            className="w-full px-3 py-2 rounded-lg font-semibold text-xs flex items-center gap-3 text-indigo-700 bg-indigo-50/60 hover:bg-indigo-50 transition-colors"
+          >
+            <KeyRound className="w-4 h-4 text-indigo-600" />
+            <span>Change My Email or Password</span>
+          </button>
         </div>
       )}
+
+      {/* Account & Security Settings Modal */}
+      <AccountSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </>
   );
 };

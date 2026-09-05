@@ -188,17 +188,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // fallback
     }
 
-    // Save to server if available
-    try {
-      await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTask)
-      });
-    } catch {
-      // fallback
-    }
-
     return newTask;
   };
 
@@ -237,16 +226,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ...(proofUrl !== undefined ? { workProofUrl: proofUrl } : {}),
         ...(blockerReason !== undefined ? { blockerReason } : {}),
         updatedAt: now
-      });
-    } catch {
-      // fallback
-    }
-
-    try {
-      await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskToUpdate)
       });
     } catch {
       // fallback
@@ -299,12 +278,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       await deleteDoc(doc(db, 'assigned_tasks', taskId));
-    } catch {
-      // fallback
-    }
-
-    try {
-      await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
     } catch {
       // fallback
     }

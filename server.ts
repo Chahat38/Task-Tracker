@@ -163,6 +163,15 @@ const DEFAULT_FOUNDING_PROFILES = [
     role: 'member',
     status: 'active',
     createdAt: new Date().toISOString()
+  },
+  {
+    uid: 'user_malaika',
+    name: 'Malaika',
+    designation: 'Team Member',
+    email: 'bq76239@gmail.com',
+    role: 'member',
+    status: 'active',
+    createdAt: new Date().toISOString()
   }
 ];
 
@@ -172,7 +181,8 @@ const DEFAULT_CREDENTIALS: Record<string, string> = {
   'fatima@agency.com': 'agency2026',
   'maham@agency.com': 'agency2026',
   'remsha@agency.com': 'agency2026',
-  'shawal@agency.com': 'agency2026'
+  'shawal@agency.com': 'agency2026',
+  'bq76239@gmail.com': 'malaika'
 };
 
 function seedDefaultUsers() {
@@ -267,11 +277,16 @@ app.post(['/api/auth/super-admin-recovery', '/api/auth/admin-recovery'], (req, r
   });
 });
 
-// Fallback login endpoint (Strictly whitelisted: random emails are rejected!)
-app.all(['/api/auth/login', '/api/auth/login/'], (req, res) => {
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
+// Login endpoint handlers
+app.options(['/api/auth/login', '/api/auth/login/'], (req, res) => {
+  res.sendStatus(200);
+});
+
+app.get(['/api/auth/login', '/api/auth/login/'], (req, res) => {
+  res.json({ success: true, status: 'ready', service: 'auth-login' });
+});
+
+app.post(['/api/auth/login', '/api/auth/login/'], (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ success: false, error: 'Email and password are required.' });
