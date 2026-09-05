@@ -117,72 +117,88 @@ const DEFAULT_FOUNDING_PROFILES = [
     email: 'chahathassanain@gmail.com',
     role: 'admin',
     status: 'active',
-    createdAt: new Date().toISOString()
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_saeed',
     name: 'M. Saeed',
-    designation: 'CEO',
-    email: 'saeed@agency.com',
+    designation: 'Head of SEO / Admin',
+    email: 'saeed.digital.seo@gmail.com',
     role: 'admin',
     status: 'active',
-    createdAt: new Date().toISOString()
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_fatima',
     name: 'Fatima Huma',
-    designation: 'COO',
-    email: 'fatima@agency.com',
+    designation: 'Senior Editor / Admin',
+    email: 'fatimahuma.english@gmail.com',
     role: 'admin',
     status: 'active',
-    createdAt: new Date().toISOString()
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_maham',
     name: 'Maham Noor',
     designation: 'Content Creator Head',
-    email: 'maham@agency.com',
+    email: 'mahamnoor.digital@gmail.com',
     role: 'member',
     status: 'active',
-    createdAt: new Date().toISOString()
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_remsha',
     name: 'Remsha',
     designation: 'Social Media Head',
-    email: 'remsha@agency.com',
+    email: 'bangashremsha0@gmail.com',
     role: 'member',
     status: 'active',
-    createdAt: new Date().toISOString()
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_shawal',
-    name: 'Shawal',
+    name: 'Shawal Manzoor',
     designation: 'Technical Head',
-    email: 'shawal@agency.com',
+    email: 'shawalmanzoor865@gmail.com',
     role: 'member',
     status: 'active',
-    createdAt: new Date().toISOString()
+    createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_malaika',
-    name: 'Malaika',
-    designation: 'Team Member',
+    name: 'Malaika Atiq',
+    designation: 'Internee',
     email: 'bq76239@gmail.com',
     role: 'member',
     status: 'active',
-    createdAt: new Date().toISOString()
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_neha',
+    name: 'Neha Shah',
+    designation: 'Internee',
+    email: 'nehashaah45@gmail.com',
+    role: 'member',
+    status: 'active',
+    createdAt: '2026-01-01T00:00:00.000Z'
   }
 ];
 
 const DEFAULT_CREDENTIALS: Record<string, string> = {
   'chahathassanain@gmail.com': 'Tahahc2020',
+  'saeed.digital.seo@gmail.com': 'agency2026',
+  'fatimahuma.english@gmail.com': 'agency2026',
+  'mahamnoor.digital@gmail.com': 'agency2026',
+  'bangashremsha0@gmail.com': 'agency2026',
+  'shawalmanzoor865@gmail.com': 'agency2026',
+  'bq76239@gmail.com': 'agency2026',
+  'nehashaah45@gmail.com': 'agency2026',
+  // Backward compatibility aliases
   'saeed@agency.com': 'agency2026',
   'fatima@agency.com': 'agency2026',
   'maham@agency.com': 'agency2026',
   'remsha@agency.com': 'agency2026',
-  'shawal@agency.com': 'agency2026',
-  'bq76239@gmail.com': 'malaika'
+  'shawal@agency.com': 'agency2026'
 };
 
 function seedDefaultUsers() {
@@ -192,6 +208,30 @@ function seedDefaultUsers() {
     modified = true;
   }
 
+  // Automatic migration of old legacy emails to new official emails
+  const LEGACY_EMAIL_MIGRATIONS: Record<string, { newEmail: string; name: string; designation: string; role: string }> = {
+    'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'M. Saeed', designation: 'Head of SEO / Admin', role: 'admin' },
+    'fatima@agency.com': { newEmail: 'fatimahuma.english@gmail.com', name: 'Fatima Huma', designation: 'Senior Editor / Admin', role: 'admin' },
+    'maham@agency.com': { newEmail: 'mahamnoor.digital@gmail.com', name: 'Maham Noor', designation: 'Content Creator Head', role: 'member' },
+    'remsha@agency.com': { newEmail: 'bangashremsha0@gmail.com', name: 'Remsha', designation: 'Social Media Head', role: 'member' },
+    'shawal@agency.com': { newEmail: 'shawalmanzoor865@gmail.com', name: 'Shawal Manzoor', designation: 'Technical Head', role: 'member' }
+  };
+
+  for (const [oldEmail, mig] of Object.entries(LEGACY_EMAIL_MIGRATIONS)) {
+    const existing = Object.values(store.users).find((u: any) => u.email?.toLowerCase() === oldEmail.toLowerCase());
+    if (existing) {
+      const oldPass = store.credentials[oldEmail] || 'agency2026';
+      existing.email = mig.newEmail;
+      existing.name = mig.name;
+      existing.designation = mig.designation;
+      existing.role = mig.role;
+      store.credentials[mig.newEmail] = oldPass;
+      delete store.credentials[oldEmail];
+      modified = true;
+    }
+  }
+
+  // Seed default credentials
   for (const [email, pass] of Object.entries(DEFAULT_CREDENTIALS)) {
     const norm = email.toLowerCase();
     if (!store.credentials[norm]) {
@@ -200,16 +240,33 @@ function seedDefaultUsers() {
     }
   }
 
+  // Seed default founding profiles
   for (const profile of DEFAULT_FOUNDING_PROFILES) {
     const existing = Object.values(store.users).find(
-      (u: any) => u.email?.toLowerCase() === profile.email.toLowerCase()
+      (u: any) => u.email?.toLowerCase() === profile.email.toLowerCase() || u.uid === profile.uid
     );
     if (!existing) {
       store.users[profile.uid] = profile;
       modified = true;
     } else {
-      // Migrate any legacy super_admin role to admin
+      // Sync info if different
+      if (existing.email?.toLowerCase() !== profile.email.toLowerCase()) {
+        existing.email = profile.email;
+        modified = true;
+      }
+      if (existing.name !== profile.name) {
+        existing.name = profile.name;
+        modified = true;
+      }
+      if (existing.designation !== profile.designation) {
+        existing.designation = profile.designation;
+        modified = true;
+      }
       if (existing.role === 'super_admin') {
+        existing.role = 'admin';
+        modified = true;
+      }
+      if (profile.role === 'admin' && existing.role !== 'admin') {
         existing.role = 'admin';
         modified = true;
       }

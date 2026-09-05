@@ -7,62 +7,70 @@
       "email": "chahathassanain@gmail.com",
       "role": "admin",
       "status": "active",
-      "createdAt": "2026-09-04T17:18:33.946Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
     },
     "user_saeed": {
       "uid": "user_saeed",
       "name": "M. Saeed",
-      "designation": "CEO",
-      "email": "saeed@agency.com",
+      "designation": "Head of SEO / Admin",
+      "email": "saeed.digital.seo@gmail.com",
       "role": "admin",
       "status": "active",
-      "createdAt": "2026-09-04T17:18:33.946Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
     },
     "user_fatima": {
       "uid": "user_fatima",
       "name": "Fatima Huma",
-      "designation": "COO",
-      "email": "fatima@agency.com",
+      "designation": "Senior Editor / Admin",
+      "email": "fatimahuma.english@gmail.com",
       "role": "admin",
       "status": "active",
-      "createdAt": "2026-09-04T17:18:33.946Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
     },
     "user_maham": {
       "uid": "user_maham",
       "name": "Maham Noor",
       "designation": "Content Creator Head",
-      "email": "maham@agency.com",
+      "email": "mahamnoor.digital@gmail.com",
       "role": "member",
       "status": "active",
-      "createdAt": "2026-09-04T17:18:33.946Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
     },
     "user_remsha": {
       "uid": "user_remsha",
       "name": "Remsha",
       "designation": "Social Media Head",
-      "email": "remsha@agency.com",
+      "email": "bangashremsha0@gmail.com",
       "role": "member",
       "status": "active",
-      "createdAt": "2026-09-04T17:18:33.946Z",
-      "updatedAt": "2026-09-04T18:24:35.820Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
     },
     "user_shawal": {
       "uid": "user_shawal",
-      "name": "Shawal",
+      "name": "Shawal Manzoor",
       "designation": "Technical Head",
-      "email": "shawal@agency.com",
+      "email": "shawalmanzoor865@gmail.com",
       "role": "member",
       "status": "active",
-      "createdAt": "2026-09-04T17:18:33.946Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
     },
     "user_malaika": {
       "uid": "user_malaika",
-      "name": "Malaika",
-      "designation": "Team Member",
+      "name": "Malaika Atiq",
+      "designation": "Internee",
       "email": "bq76239@gmail.com",
       "role": "member",
       "status": "active",
-      "createdAt": "2026-09-05T04:20:00.000Z"
+      "createdAt": "2026-01-01T00:00:00.000Z"
+    },
+    "user_neha": {
+      "uid": "user_neha",
+      "name": "Neha Shah",
+      "designation": "Internee",
+      "email": "nehashaah45@gmail.com",
+      "role": "member",
+      "status": "active",
+      "createdAt": "2026-01-01T00:00:00.000Z"
     }
   },
   "entries": [
@@ -72,35 +80,18 @@
       "date": "2026-09-04",
       "completedToday": "Tested API sync",
       "id": "entry_1788546730859_ebbvw1i"
-    },
-    {
-      "userId": "test",
-      "date": "2026-09-04",
-      "tasksDone": [
-        "done"
-      ],
-      "id": "entry_1788546505544_3pgzzy8"
-    },
-    {
-      "userId": "test1",
-      "date": "2026-09-04",
-      "tasksDone": [
-        "done something"
-      ],
-      "id": "entry_1788546421848_n8f83ao"
     }
   ],
-  "resetPasswords": {
-    "test@agency.com": "91990d75851e0bdd74e60a82bf6db33c1a8490f823b1a1e99e4de020bd5f39fb"
-  },
+  "resetPasswords": {},
   "credentials": {
-    "chahathassanain@gmail.com": "COFOUNDER-AGENCY-2026",
-    "saeed@agency.com": "agency2026",
-    "fatima@agency.com": "agency2026",
-    "maham@agency.com": "agency2026",
-    "remsha@agency.com": "agency2026",
-    "shawal@agency.com": "agency2026",
-    "bq76239@gmail.com": "malaika"
+    "chahathassanain@gmail.com": "Tahahc2020",
+    "saeed.digital.seo@gmail.com": "agency2026",
+    "fatimahuma.english@gmail.com": "agency2026",
+    "mahamnoor.digital@gmail.com": "agency2026",
+    "bangashremsha0@gmail.com": "agency2026",
+    "shawalmanzoor865@gmail.com": "agency2026",
+    "bq76239@gmail.com": "agency2026",
+    "nehashaah45@gmail.com": "agency2026"
   },
   "tasks": []
 }

@@ -25,11 +25,7 @@ import {
   Copy,
   Trash2,
   KeyRound,
-  RefreshCw,
-  CloudUpload,
-  Share2,
-  Smartphone,
-  ExternalLink
+  RefreshCw
 } from 'lucide-react';
 import { AccountSettingsModal } from './AccountSettingsModal';
 import { getStoredPassword } from '../context/AuthContext';
@@ -41,11 +37,7 @@ export const UserManagement: React.FC = () => {
     updateUserProfile,
     refreshUsers,
     provisionUserDirect,
-    deleteUserDirect,
-    exportRosterCode,
-    importRosterCode,
-    pushRosterToCloud,
-    pullRosterFromCloud
+    deleteUserDirect
   } = useAuth();
   const isAdmin = currentUser?.role === 'admin' || (currentUser?.role as string) === 'super_admin';
 
@@ -70,13 +62,6 @@ export const UserManagement: React.FC = () => {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [showNewPassword, setShowNewPassword] = useState(false);
-
-  // Cross-Device Sync Modal State
-  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
-  const [isPushingCloud, setIsPushingCloud] = useState(false);
-  const [syncModalFeedback, setSyncModalFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [copiedSyncCode, setCopiedSyncCode] = useState(false);
-  const [adminImportCode, setAdminImportCode] = useState('');
 
   // Success Toast & Created User banner
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -349,56 +334,6 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const handlePushToCloud = async () => {
-    setIsPushingCloud(true);
-    setSyncModalFeedback(null);
-    try {
-      const res = await pushRosterToCloud();
-      if (res.success) {
-        setSyncModalFeedback({ type: 'success', text: res.message });
-      } else {
-        setSyncModalFeedback({ type: 'error', text: res.message });
-      }
-    } catch (e: any) {
-      setSyncModalFeedback({ type: 'error', text: e.message || 'Push to cloud failed.' });
-    } finally {
-      setIsPushingCloud(false);
-    }
-  };
-
-  const handleCopySyncCode = () => {
-    try {
-      const code = exportRosterCode();
-      if (!code) throw new Error('Could not generate sync code.');
-      navigator.clipboard.writeText(code);
-      setCopiedSyncCode(true);
-      setTimeout(() => setCopiedSyncCode(false), 2500);
-      setSyncModalFeedback({
-        type: 'success',
-        text: 'Sync code copied to clipboard! Team members can paste this into "Sync Roster" on their mobile login page to immediately receive updated passwords and new accounts.'
-      });
-    } catch (e: any) {
-      setSyncModalFeedback({ type: 'error', text: e.message || 'Failed to copy code.' });
-    }
-  };
-
-  const handleAdminImportCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!adminImportCode.trim()) return;
-    setSyncModalFeedback(null);
-    try {
-      const res = await importRosterCode(adminImportCode.trim());
-      if (res.success) {
-        setSyncModalFeedback({ type: 'success', text: res.message });
-        setAdminImportCode('');
-      } else {
-        setSyncModalFeedback({ type: 'error', text: res.message });
-      }
-    } catch (e: any) {
-      setSyncModalFeedback({ type: 'error', text: e.message || 'Failed to import code.' });
-    }
-  };
-
   // Filter users
   const filteredUsers = allUsers.filter((u) => {
     if (!searchFilter.trim()) return true;
@@ -441,22 +376,6 @@ export const UserManagement: React.FC = () => {
           >
             <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
             <span>My Email & Password</span>
-          </button>
-
-          {/* Cross-Device Sync Action */}
-          <button
-            type="button"
-            id="btn-sync-devices"
-            onClick={() => {
-              setIsSyncModalOpen(true);
-              setSyncModalFeedback(null);
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer border border-emerald-200/80"
-            title="Synchronize all user emails and passwords across laptops and phones"
-          >
-            <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="hidden sm:inline">Sync Across Devices</span>
-            <span className="sm:hidden">Sync</span>
           </button>
 
           {/* Recovery Key Modal Trigger - Available to all Admins */}
@@ -1099,170 +1018,6 @@ export const UserManagement: React.FC = () => {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-        )}
-
-        {/* Cross-Device Synchronization Modal */}
-        {isSyncModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-            <div className="max-w-xl w-full bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
-                    <Smartphone className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-800 tracking-tight">
-                      Cross-Device Synchronization Hub
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Sync member credentials, usernames, and passwords to mobile phones & laptops.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsSyncModalOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-5 overflow-y-auto flex-1">
-                {syncModalFeedback && (
-                  <div
-                    className={`p-3.5 rounded-xl text-xs flex items-start space-x-2.5 ${
-                      syncModalFeedback.type === 'success'
-                        ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
-                        : 'bg-rose-50 border border-rose-200 text-rose-800'
-                    }`}
-                  >
-                    {syncModalFeedback.type === 'success' ? (
-                      <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-                    ) : (
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-                    )}
-                    <span className="leading-relaxed">{syncModalFeedback.text}</span>
-                  </div>
-                )}
-
-                {/* Action 1: Push to Firebase Cloud */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <CloudUpload className="w-4 h-4 text-indigo-600" />
-                      <span className="text-xs font-bold text-slate-800">
-                        Method 1: Push All Roster & Passwords to Cloud
-                      </span>
-                    </div>
-                    <span className="text-[10px] bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded-full border border-indigo-200">
-                      Internet Sync
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Uploads all {allUsers.length} member profiles and newly updated passwords to Firebase Firestore so other devices can pull them automatically.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handlePushToCloud}
-                    disabled={isPushingCloud}
-                    className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-60"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isPushingCloud ? 'animate-spin' : ''}`} />
-                    <span>{isPushingCloud ? 'Pushing to Firebase Cloud...' : 'Push All Roster & Credentials to Cloud'}</span>
-                  </button>
-
-                  <div className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-500 space-y-1">
-                    <p className="font-semibold text-slate-700">Firebase Console Rule Helper:</p>
-                    <p>
-                      If Firebase reports permission denied, go to{' '}
-                      <a
-                        href="https://console.firebase.google.com/project/progress-tracker-9cdec/firestore/rules"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-indigo-600 underline font-medium inline-flex items-center gap-0.5"
-                      >
-                        Firebase Console Rules <ExternalLink className="w-3 h-3" />
-                      </a>{' '}
-                      and ensure rules allow read/write:
-                    </p>
-                    <pre className="p-2 bg-slate-800 text-emerald-300 rounded text-[10px] font-mono overflow-x-auto">
-{`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}`}
-                    </pre>
-                  </div>
-                </div>
-
-                {/* Action 2: Share Sync Code */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Share2 className="w-4 h-4 text-emerald-600" />
-                      <span className="text-xs font-bold text-slate-800">
-                        Method 2: Share Roster Sync Code (100% Instant)
-                      </span>
-                    </div>
-                    <span className="text-[10px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded-full border border-emerald-200">
-                      Guaranteed
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    Copy a sync code to send to your phone or team members via WhatsApp. On their device, they simply tap <strong>"Sync Roster Across Devices"</strong> on the login screen and paste this code!
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleCopySyncCode}
-                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center space-x-2 cursor-pointer"
-                  >
-                    {copiedSyncCode ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    <span>{copiedSyncCode ? 'Sync Code Copied to Clipboard!' : 'Copy Roster Sync Code'}</span>
-                  </button>
-                </div>
-
-                {/* Action 3: Import Sync Code into this Device */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Smartphone className="w-4 h-4 text-slate-600" />
-                    <span className="text-xs font-bold text-slate-800">
-                      Method 3: Import Sync Code into this Device
-                    </span>
-                  </div>
-                  <form onSubmit={handleAdminImportCode} className="space-y-2">
-                    <textarea
-                      value={adminImportCode}
-                      onChange={(e) => setAdminImportCode(e.target.value)}
-                      placeholder="Paste AGENCY_ROSTER_... sync code here to merge credentials"
-                      rows={2}
-                      className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <button
-                      type="submit"
-                      disabled={!adminImportCode.trim()}
-                      className="py-2 px-4 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl cursor-pointer disabled:opacity-50 transition-colors"
-                    >
-                      Import & Update Local Roster
-                    </button>
-                  </form>
-                </div>
-              </div>
-
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsSyncModalOpen(false)}
-                  className="py-2 px-5 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold rounded-xl cursor-pointer"
-                >
-                  Done
-                </button>
-              </div>
             </div>
           </div>
         )}

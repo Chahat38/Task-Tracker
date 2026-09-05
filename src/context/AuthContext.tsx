@@ -46,17 +46,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const LOCAL_ROSTER_KEY = 'agency_authorized_roster_v3';
+const LOCAL_ROSTER_KEY = 'agency_authorized_roster_v4';
 const CREDENTIALS_VAULT_KEY = 'agency_credentials_vault_v2';
 
 const DEFAULT_CREDENTIALS: Record<string, string> = {
   'chahathassanain@gmail.com': 'Tahahc2020',
+  'saeed.digital.seo@gmail.com': 'agency2026',
+  'fatimahuma.english@gmail.com': 'agency2026',
+  'mahamnoor.digital@gmail.com': 'agency2026',
+  'bangashremsha0@gmail.com': 'agency2026',
+  'shawalmanzoor865@gmail.com': 'agency2026',
+  'bq76239@gmail.com': 'agency2026',
+  'nehashaah45@gmail.com': 'agency2026',
+  // Backward compatibility aliases
   'saeed@agency.com': 'agency2026',
   'fatima@agency.com': 'agency2026',
   'maham@agency.com': 'agency2026',
   'remsha@agency.com': 'agency2026',
-  'shawal@agency.com': 'agency2026',
-  'bq76239@gmail.com': 'malaika'
+  'shawal@agency.com': 'agency2026'
 };
 
 export function getStoredPassword(email: string): string {
@@ -102,8 +109,8 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   {
     uid: 'user_saeed',
     name: 'M. Saeed',
-    designation: 'CEO',
-    email: 'saeed@agency.com',
+    designation: 'Head of SEO / Admin',
+    email: 'saeed.digital.seo@gmail.com',
     role: 'admin',
     status: 'active',
     password: 'agency2026',
@@ -112,8 +119,8 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   {
     uid: 'user_fatima',
     name: 'Fatima Huma',
-    designation: 'COO',
-    email: 'fatima@agency.com',
+    designation: 'Senior Editor / Admin',
+    email: 'fatimahuma.english@gmail.com',
     role: 'admin',
     status: 'active',
     password: 'agency2026',
@@ -123,7 +130,7 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
     uid: 'user_maham',
     name: 'Maham Noor',
     designation: 'Content Creator Head',
-    email: 'maham@agency.com',
+    email: 'mahamnoor.digital@gmail.com',
     role: 'member',
     status: 'active',
     password: 'agency2026',
@@ -133,7 +140,7 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
     uid: 'user_remsha',
     name: 'Remsha',
     designation: 'Social Media Head',
-    email: 'remsha@agency.com',
+    email: 'bangashremsha0@gmail.com',
     role: 'member',
     status: 'active',
     password: 'agency2026',
@@ -141,9 +148,9 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   },
   {
     uid: 'user_shawal',
-    name: 'Shawal',
+    name: 'Shawal Manzoor',
     designation: 'Technical Head',
-    email: 'shawal@agency.com',
+    email: 'shawalmanzoor865@gmail.com',
     role: 'member',
     status: 'active',
     password: 'agency2026',
@@ -151,42 +158,80 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   },
   {
     uid: 'user_malaika',
-    name: 'Malaika',
-    designation: 'Team Member',
+    name: 'Malaika Atiq',
+    designation: 'Internee',
     email: 'bq76239@gmail.com',
     role: 'member',
     status: 'active',
-    password: 'malaika',
+    password: 'agency2026',
+    createdAt: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    uid: 'user_neha',
+    name: 'Neha Shah',
+    designation: 'Internee',
+    email: 'nehashaah45@gmail.com',
+    role: 'member',
+    status: 'active',
+    password: 'agency2026',
     createdAt: '2026-01-01T00:00:00.000Z'
   }
 ];
+
+const LEGACY_EMAIL_MIGRATIONS: Record<string, { newEmail: string; name: string; designation: string; role: UserRole }> = {
+  'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'M. Saeed', designation: 'Head of SEO / Admin', role: 'admin' },
+  'fatima@agency.com': { newEmail: 'fatimahuma.english@gmail.com', name: 'Fatima Huma', designation: 'Senior Editor / Admin', role: 'admin' },
+  'maham@agency.com': { newEmail: 'mahamnoor.digital@gmail.com', name: 'Maham Noor', designation: 'Content Creator Head', role: 'member' },
+  'remsha@agency.com': { newEmail: 'bangashremsha0@gmail.com', name: 'Remsha', designation: 'Social Media Head', role: 'member' },
+  'shawal@agency.com': { newEmail: 'shawalmanzoor865@gmail.com', name: 'Shawal Manzoor', designation: 'Technical Head', role: 'member' }
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
     try {
-      const stored = localStorage.getItem(LOCAL_ROSTER_KEY);
+      const stored = localStorage.getItem(LOCAL_ROSTER_KEY) || localStorage.getItem('agency_authorized_roster_v3');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge with defaults and migrate any super_admin to admin
           const map = new Map<string, UserProfile>();
+          // Pre-populate with all official defaults
           DEFAULT_AUTHORIZED_ROSTER.forEach((u) => map.set(u.uid, u));
+
           parsed.forEach((u: UserProfile) => {
-            const role = (u.role as string) === 'super_admin' ? 'admin' : u.role;
-            const def = DEFAULT_AUTHORIZED_ROSTER.find((d) => d.uid === u.uid);
-            const password = u.password || getStoredPassword(u.email || '') || def?.password || 'agency2026';
-            map.set(u.uid, {
+            const rawEmail = (u.email || '').toLowerCase().trim();
+            const mig = LEGACY_EMAIL_MIGRATIONS[rawEmail];
+            const finalEmail = mig ? mig.newEmail : rawEmail;
+            const finalName = mig ? mig.name : u.name;
+            const finalDesignation = mig ? mig.designation : u.designation;
+            const finalRole = mig ? mig.role : ((u.role as string) === 'super_admin' ? 'admin' : u.role);
+
+            const def = DEFAULT_AUTHORIZED_ROSTER.find((d) => d.uid === u.uid || d.email.toLowerCase() === finalEmail);
+            const password = u.password || getStoredPassword(finalEmail) || def?.password || 'agency2026';
+
+            const mergedUser: UserProfile = {
               ...u,
-              role,
-              password
-            });
-            if (u.email && password) {
-              saveStoredPassword(u.email, password);
+              uid: def?.uid || u.uid,
+              name: def?.name || finalName,
+              designation: def?.designation || finalDesignation,
+              email: def?.email || finalEmail,
+              role: (def?.role === 'admin' ? 'admin' : finalRole) as UserRole,
+              password,
+              status: u.status || 'active'
+            };
+
+            map.set(mergedUser.uid, mergedUser);
+            if (mergedUser.email && password) {
+              saveStoredPassword(mergedUser.email, password);
             }
           });
-          return Array.from(map.values());
+
+          const result = Array.from(map.values());
+          try {
+            localStorage.setItem(LOCAL_ROSTER_KEY, JSON.stringify(result));
+          } catch {}
+          return result;
         }
       }
     } catch {
