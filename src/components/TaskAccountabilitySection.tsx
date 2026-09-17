@@ -569,7 +569,7 @@ export const TaskAccountabilitySection: React.FC<TaskAccountabilitySectionProps>
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:ring-1 focus:ring-indigo-500"
                   required
                 >
-                  <option value="">Select Member (Maham, Remsha, Shawal, etc.)</option>
+                  <option value="">Select Member (Remsha, Shawal, Malaika, etc.)</option>
                   {assignableUsers.map((u) => (
                     <option key={u.uid} value={u.uid}>
                       {u.name} — {u.designation}

@@ -24,12 +24,13 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   isOpen,
   onClose
 }) => {
-  const { currentUser, updateUserProfile, allUsers } = useAuth();
+  const { currentUser, updateUserProfile, changeMyPassword, allUsers } = useAuth();
 
   const [name, setName] = useState('');
   const [designation, setDesignation] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -42,8 +43,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       setName(currentUser.name || '');
       setDesignation(currentUser.designation || '');
       setEmail(currentUser.email || '');
-      setPassword(currentUser.password || '');
-      setConfirmPassword(currentUser.password || '');
+      setCurrentPassword(currentUser.password || '');
+      setNewPassword('');
+      setConfirmPassword('');
       setErrorMessage(null);
       setSuccessMessage(null);
     }
@@ -61,7 +63,8 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     const trimmedName = name.trim();
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedDesignation = designation.trim();
-    const trimmedPass = password.trim();
+    const trimmedCurrentPass = currentPassword.trim();
+    const trimmedNewPass = newPassword.trim();
 
     if (!trimmedName) {
       setErrorMessage('Full Name is required.');
@@ -82,32 +85,41 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       return;
     }
 
-    if (!trimmedPass) {
-      setErrorMessage('Password cannot be empty.');
-      return;
-    }
-
-    if (trimmedPass.length < 4) {
-      setErrorMessage('Password must be at least 4 characters long.');
-      return;
-    }
-
-    if (confirmPassword.trim() !== trimmedPass) {
-      setErrorMessage('Passwords do not match. Please verify your confirm password.');
-      return;
+    // If changing password, validate
+    const isChangingPassword = trimmedNewPass.length > 0;
+    if (isChangingPassword) {
+      if (!trimmedCurrentPass) {
+        setErrorMessage('Current password is required to authorize changing your password.');
+        return;
+      }
+      if (trimmedNewPass.length < 4) {
+        setErrorMessage('New password must be at least 4 characters long.');
+        return;
+      }
+      if (confirmPassword.trim() !== trimmedNewPass) {
+        setErrorMessage('New passwords do not match. Please verify your confirm password.');
+        return;
+      }
     }
 
     setSaving(true);
     try {
+      // 1. Update Profile details (Name, Designation, Email)
       await updateUserProfile(currentUser.uid, {
         name: trimmedName,
         email: trimmedEmail,
-        designation: trimmedDesignation,
-        password: trimmedPass
+        designation: trimmedDesignation
       });
 
+      // 2. If password change was requested, call dedicated endpoint
+      if (isChangingPassword) {
+        await changeMyPassword(trimmedCurrentPass, trimmedNewPass);
+      }
+
       setSuccessMessage(
-        'Your profile, email, and password have been updated successfully! You can now use this email and password for future logins.'
+        isChangingPassword
+          ? 'Your profile, email, and password have been securely updated! Please use your new password next time you sign in.'
+          : 'Your profile details have been saved successfully!'
       );
 
       setTimeout(() => {
@@ -248,48 +260,79 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
           {/* Password Section */}
           <div className="pt-2 border-t border-slate-100 space-y-3">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-slate-700">
-                New Login Password
-              </label>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700">
+                  Change Account Password
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  Leave new password empty if you only want to update your name or email.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="text-[11px] text-slate-500 hover:text-indigo-600 flex items-center gap-1 cursor-pointer transition-colors"
               >
                 {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                <span>{showPassword ? 'Hide password' : 'Show password'}</span>
+                <span>{showPassword ? 'Hide' : 'Show'}</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Current Password Field */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                Current Password {newPassword && <span className="text-rose-500">*</span>}
+              </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  required
-                  id="input-change-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter new password"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 focus:bg-white rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono"
-                />
-              </div>
-
-              <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  id="input-confirm-password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm new password"
+                  id="input-current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password to verify"
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 focus:bg-white rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono"
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  New Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="input-change-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="New password (optional)"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 focus:bg-white rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="input-confirm-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 focus:bg-white rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono"
+                  />
+                </div>
+              </div>
+            </div>
             <p className="text-[11px] text-slate-500">
-              Set any password you prefer. We recommend at least 6 characters.
+              Only you can change your personal password here. We recommend at least 6 characters.
             </p>
           </div>
 
@@ -308,7 +351,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
               disabled={saving}
               className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
             >
-              {saving ? 'Updating Credentials...' : 'Save Email & Password'}
+              {saving ? 'Updating Credentials...' : (newPassword ? 'Update Password & Profile' : 'Save Profile Changes')}
             </button>
           </div>
         </form>

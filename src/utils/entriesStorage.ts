@@ -25,24 +25,24 @@ const getYesterdayString = () => {
 
 export const INITIAL_SEED_ENTRIES: ProgressEntry[] = [
   {
-    id: 'entry_seed_maham_today',
-    userId: 'user_maham',
-    userName: 'Maham Noor',
-    userDesignation: 'Content Creator Head',
+    id: 'entry_seed_malaika_today',
+    userId: 'user_malaika',
+    userName: 'Malaika',
+    userDesignation: 'Graphic Designer',
     userRole: 'member',
-    activities: 'Scripted and recorded 3 product showcase reels for the upcoming fashion client launch.',
-    completedToday: '1. Scripted 3 Reels with trending audio hooks.\n2. Shot B-roll footage in the studio with model.\n3. Edited Reel #1 with dynamic captions in Premiere.',
-    currentlyWorking: 'Color grading and sound effect mixing for Reel #2 and Reel #3.',
-    pendingWork: 'Export high-res 4K renders and upload to client Drive folder.',
+    activities: 'Designed branding moodboard, typography guidelines, and 6 Instagram feed grid carousels.',
+    completedToday: '1. Designed 6 carousel slides in Figma with client design system.\n2. Exported SVG logos in transparent light/dark variants.\n3. Updated master branding kit document.',
+    currentlyWorking: 'Designing packaging label stickers for client delivery boxes.',
+    pendingWork: 'Final print-ready PDF proof for the packaging factory.',
     completedTasksList: [
-      { id: 't_m1', title: 'Script 3 product showcase reels', category: 'Creative' },
-      { id: 't_m2', title: 'Studio B-roll filming session', category: 'Production' }
+      { id: 't_m1', title: '6 IG feed carousel graphic layouts', category: 'Design' },
+      { id: 't_m2', title: 'Export vector asset library', category: 'Assets' }
     ],
     pendingTasksList: [
-      { id: 't_m3', title: 'Final video rendering and Drive upload', priority: 'high' }
+      { id: 't_m3', title: 'Packaging sticker vector layout', priority: 'high' }
     ],
-    blockers: 'Waiting on client approval for the revised product pricing callout in clip 2.',
-    nextDayPlan: 'Record voiceover for behind-the-scenes carousel and send to Remsha for scheduling.',
+    blockers: 'Need exact box millimeter dimensions from vendor.',
+    nextDayPlan: 'Finish packaging design and start YouTube thumbnail batch.',
     hoursSpent: '7.5',
     date: getTodayString(),
     createdAt: new Date().toISOString()
@@ -51,7 +51,7 @@ export const INITIAL_SEED_ENTRIES: ProgressEntry[] = [
     id: 'entry_seed_remsha_today',
     userId: 'user_remsha',
     userName: 'Remsha',
-    userDesignation: 'Social Media Head',
+    userDesignation: 'Social Media Director',
     userRole: 'member',
     activities: 'Managed Instagram and TikTok community engagement and published scheduled story sequence.',
     completedToday: '1. Responded to 85+ customer direct messages and comment inquiries.\n2. Published interactive IG polls and weekly AMA stickers.\n3. Reviewed weekly analytics report for beauty brand.',
@@ -74,22 +74,22 @@ export const INITIAL_SEED_ENTRIES: ProgressEntry[] = [
     id: 'entry_seed_shawal_today',
     userId: 'user_shawal',
     userName: 'Shawal',
-    userDesignation: 'Graphic Designer',
+    userDesignation: 'Technical Head',
     userRole: 'member',
-    activities: 'Designed branding moodboard, typography guidelines, and 6 Instagram feed grid carousels.',
-    completedToday: '1. Designed 6 carousel slides in Figma with client design system.\n2. Exported SVG logos in transparent light/dark variants.\n3. Updated master branding kit document.',
-    currentlyWorking: 'Designing packaging label stickers for client delivery boxes.',
-    pendingWork: 'Final print-ready PDF proof for the packaging factory.',
+    activities: 'Technical infrastructure audit, deployment automation, and real-time backend endpoint optimizations.',
+    completedToday: '1. Tested and deployed real-time data sync across all admin dashboards.\n2. Updated server endpoints for password security and self-service accounts.\n3. Verified real-time state integrity across multi-tab sessions.',
+    currentlyWorking: 'Fine-tuning latency of sync polling and state broadcast channels.',
+    pendingWork: 'Client staging server container verification.',
     completedTasksList: [
-      { id: 't_s1', title: '6 IG feed carousel graphic layouts', category: 'Design' },
-      { id: 't_s2', title: 'Export vector asset library', category: 'Assets' }
+      { id: 't_s1', title: 'Real-time multi-admin sync architecture', category: 'Technical' },
+      { id: 't_s2', title: 'Security permissions enforcement', category: 'Security' }
     ],
     pendingTasksList: [
-      { id: 't_s3', title: 'Packaging sticker vector layout', priority: 'high' }
+      { id: 't_s3', title: 'Staging verification test suite', priority: 'medium' }
     ],
-    blockers: 'Need exact box millimeter dimensions from vendor.',
-    nextDayPlan: 'Finish packaging design and start YouTube thumbnail batch.',
-    hoursSpent: '7',
+    blockers: 'None. All systems operational.',
+    nextDayPlan: 'Review backend load performance metrics.',
+    hoursSpent: '7.5',
     date: getTodayString(),
     createdAt: new Date().toISOString()
   },
@@ -97,7 +97,7 @@ export const INITIAL_SEED_ENTRIES: ProgressEntry[] = [
     id: 'entry_seed_chahat_yesterday',
     userId: 'user_chahat',
     userName: 'Chahat',
-    userDesignation: 'Managing Director',
+    userDesignation: 'Co-founder & Managing Director',
     userRole: 'admin',
     activities: 'Executive operations review, client contract renewal strategy, and sprint planning.',
     completedToday: '1. Reviewed client deliverable roadmap for September.\n2. Approved team task assignments and verified content output.\n3. Conducted weekly agency check-in meeting.',
@@ -124,7 +124,11 @@ export function getLocalEntries(): ProgressEntry[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Filter out any purged members like Maham Noor
+        const filtered = parsed.filter(
+          (e) => e.userId !== 'user_maham' && !e.userName?.toLowerCase().includes('maham')
+        );
+        return filtered.length > 0 ? filtered : INITIAL_SEED_ENTRIES;
       }
     }
   } catch (err) {
@@ -186,7 +190,17 @@ export async function upsertProgressEntry(entry: ProgressEntry): Promise<{
     // ignore
   }
 
-  // 3. Background safe sync to Firestore (Catches adblocker ERR_BLOCKED_BY_CLIENT or permissions quietly)
+  // 3. Background safe sync to Server & Firestore
+  try {
+    fetch('/api/sync/entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(normalizedEntry)
+    }).catch(() => {});
+  } catch {
+    // safe fallback
+  }
+
   try {
     setDoc(doc(db, 'progress_entries', finalId), normalizedEntry).catch((err) => {
       console.debug('Firestore background sync notice (handled):', err?.message);
@@ -296,7 +310,7 @@ export function subscribeToEntries(
     console.debug('Firestore listener init notice:', err?.message);
   }
 
-  // 4. Single server check (Catches 405/404 without spamming)
+  // 4. Server sync polling (Every 3.5 seconds + focus / visibility)
   const fetchServerEntries = async () => {
     try {
       const res = await fetch('/api/sync/entries');
@@ -311,8 +325,19 @@ export function subscribeToEntries(
   };
 
   fetchServerEntries();
+  const pollTimer = setInterval(fetchServerEntries, 3500);
+
+  const onWindowFocus = () => fetchServerEntries();
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') fetchServerEntries();
+  };
+  window.addEventListener('focus', onWindowFocus);
+  document.addEventListener('visibilitychange', onVisibility);
 
   return () => {
+    clearInterval(pollTimer);
+    window.removeEventListener('focus', onWindowFocus);
+    document.removeEventListener('visibilitychange', onVisibility);
     window.removeEventListener(ENTRIES_CHANGED_EVENT, handleCustomEvent);
     window.removeEventListener('storage', handleStorageEvent);
     if (unsubscribeFirestore) {

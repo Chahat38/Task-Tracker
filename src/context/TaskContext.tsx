@@ -22,29 +22,24 @@ interface TaskContextType {
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'agency_assigned_tasks_v2';
+const LOCAL_STORAGE_KEY = 'agency_assigned_tasks_v3';
 
 // Realistic initial tasks assigned by Managing Director
 const INITIAL_TASKS: AssignedTask[] = [
   {
     id: 'task_init_1',
-    title: 'Create 5 Reels and Carousels for Summer Campaign',
-    description: 'Produce high-converting video reels and carousel graphics for our primary client campaign.',
-    assignedToUid: 'user_maham',
-    assignedToName: 'Maham Noor',
-    assignedToDesignation: 'Content Creator Head',
+    title: 'Brand Style Guide & Vector Graphic Assets',
+    description: 'Build high-converting visual graphics, branding templates, and export vector SVG illustrations.',
+    assignedToUid: 'user_malaika',
+    assignedToName: 'Malaika',
+    assignedToDesignation: 'Graphic Designer',
     assignedByUid: 'user_chahat',
     assignedByName: 'Chahat',
     assignedByRole: 'Managing Director',
     priority: 'high',
-    dueDate: '2026-09-02',
-    status: 'completed',
-    completedAt: '2026-09-02T10:30:00.000Z',
-    completionNotes: 'All 5 reels recorded, edited in CapCut with captions, and uploaded to the client Google Drive folder.',
-    workProofUrl: 'https://drive.google.com/drive/folders/sample-reels',
-    isApprovedByMD: true,
-    mdFeedback: 'Great work on the hook and audio sync!',
-    createdAt: '2026-09-01T08:00:00.000Z'
+    dueDate: '2026-09-22',
+    status: 'pending',
+    createdAt: '2026-09-05T10:00:00.000Z'
   },
   {
     id: 'task_init_2',
@@ -52,75 +47,76 @@ const INITIAL_TASKS: AssignedTask[] = [
     description: 'Queue and schedule all approved posts, reels, and stories for Monday through Sunday.',
     assignedToUid: 'user_remsha',
     assignedToName: 'Remsha',
-    assignedToDesignation: 'Social Media Head',
+    assignedToDesignation: 'Social Media Director',
     assignedByUid: 'user_chahat',
     assignedByName: 'Chahat',
     assignedByRole: 'Managing Director',
     priority: 'high',
-    dueDate: '2026-09-03',
+    dueDate: '2026-09-20',
     status: 'in_progress',
-    completionNotes: 'Caption copy finalized. Waiting on Tuesday asset render before final scheduling.',
-    createdAt: '2026-09-01T09:15:00.000Z'
+    completionNotes: 'Caption copy finalized. Waiting on graphic asset render before final scheduling.',
+    createdAt: '2026-09-05T09:15:00.000Z'
   },
   {
     id: 'task_init_3',
-    title: 'Brand Style Guide & Vector Assets for Client Onboarding',
-    description: 'Build complete brand guidelines: primary/secondary colors, typography hierarchy, and export vector SVG logos.',
+    title: 'Technical Infrastructure & System Architecture Audit',
+    description: 'Ensure real-time sync endpoints and performance optimization across all team devices.',
     assignedToUid: 'user_shawal',
     assignedToName: 'Shawal',
-    assignedToDesignation: 'Graphic Designer',
+    assignedToDesignation: 'Technical Head',
     assignedByUid: 'user_chahat',
     assignedByName: 'Chahat',
     assignedByRole: 'Managing Director',
     priority: 'high',
-    dueDate: '2026-09-02',
-    status: 'completed',
-    completedAt: '2026-09-02T14:15:00.000Z',
-    completionNotes: 'Style guide exported in PDF and Figma link shared with the team.',
-    workProofUrl: 'https://figma.com/file/sample-style-guide',
-    isApprovedByMD: true,
-    createdAt: '2026-09-01T11:00:00.000Z'
+    dueDate: '2026-09-21',
+    status: 'in_progress',
+    createdAt: '2026-09-05T11:00:00.000Z'
   },
   {
     id: 'task_init_4',
     title: 'Influencer Outreach & Engagement Campaign',
-    description: 'Reach out to 15 niche influencers in the wellness and tech space for Q4 collaboration.',
+    description: 'Reach out to 15 niche creators in the tech and branding space for Q4 collaboration.',
     assignedToUid: 'user_remsha',
     assignedToName: 'Remsha',
-    assignedToDesignation: 'Social Media Head',
+    assignedToDesignation: 'Social Media Director',
     assignedByUid: 'user_chahat',
     assignedByName: 'Chahat',
     assignedByRole: 'Managing Director',
     priority: 'medium',
-    dueDate: '2026-09-04',
+    dueDate: '2026-09-25',
     status: 'pending',
-    createdAt: '2026-09-02T08:30:00.000Z'
+    createdAt: '2026-09-05T11:30:00.000Z'
   },
   {
     id: 'task_init_5',
     title: 'Client Monthly Analytics & Performance Review Deck',
     description: 'Compile month-over-month engagement, ROAS, and conversion metrics for executive presentation.',
     assignedToUid: 'user_fatima',
-    assignedToName: 'Fatima Huma',
-    assignedToDesignation: 'COO',
+    assignedToName: 'Fatima',
+    assignedToDesignation: 'Co-founder & HR Manager',
     assignedByUid: 'user_chahat',
     assignedByName: 'Chahat',
     assignedByRole: 'Managing Director',
     priority: 'high',
-    dueDate: '2026-09-03',
+    dueDate: '2026-09-23',
     status: 'in_progress',
     completionNotes: 'Analytics extracted from Shopify & Meta ads. Putting slides into template.',
-    createdAt: '2026-09-02T09:00:00.000Z'
+    createdAt: '2026-09-05T12:00:00.000Z'
   }
 ];
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tasks, setTasks] = useState<AssignedTask[]>(() => {
     try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+      const stored = localStorage.getItem(LOCAL_STORAGE_KEY) || localStorage.getItem('agency_assigned_tasks_v2');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const filtered = parsed.filter(
+            (t) => t.assignedToUid !== 'user_maham' && !t.assignedToName?.toLowerCase().includes('maham')
+          );
+          if (filtered.length > 0) return filtered;
+        }
       }
     } catch {
       // ignore
@@ -130,22 +126,81 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [loading, setLoading] = useState(false);
 
-  // Sync with LocalStorage
+  // Sync with LocalStorage and notify other tabs
   const persistTasks = useCallback((newTasks: AssignedTask[]) => {
-    setTasks(newTasks);
+    // Purge any Maham tasks
+    const cleanTasks = newTasks.filter(
+      (t) => t.assignedToUid !== 'user_maham' && !t.assignedToName?.toLowerCase().includes('maham')
+    );
+    setTasks(cleanTasks);
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newTasks));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleanTasks));
     } catch (e) {
       console.warn('LocalStorage save error:', e);
     }
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('agency_auto_sync_channel');
+        bc.postMessage('tasks_updated');
+        bc.close();
+      }
+    } catch {}
   }, []);
 
-  // Sync with Firestore if available
+  const refreshTasks = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tasks');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.tasks && Array.isArray(data.tasks)) {
+          const clean = data.tasks.filter(
+            (t: any) => t.assignedToUid !== 'user_maham' && !t.assignedToName?.toLowerCase().includes('maham')
+          );
+          persistTasks(clean);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [persistTasks]);
+
+  // Real-time synchronization engine across ALL admin panels
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
+    let unsubscribeFirestore: (() => void) | undefined;
+    let pollInterval: any = null;
+    let channel: BroadcastChannel | null = null;
+
+    // 1. Initial server fetch
+    refreshTasks();
+
+    // 2. Poll every 2.5 seconds for instant multi-admin sync
+    pollInterval = setInterval(refreshTasks, 2500);
+
+    // 3. Tab focus & visibility change trigger instant refresh
+    const onFocus = () => refreshTasks();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshTasks();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    // 4. Tab-to-tab instant broadcast
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        channel = new BroadcastChannel('agency_auto_sync_channel');
+        channel.onmessage = (e) => {
+          if (e.data === 'tasks_updated') {
+            refreshTasks();
+          }
+        };
+      }
+    } catch {}
+
+    // 5. Firestore real-time listener if available
     try {
       const tasksCol = collection(db, 'assigned_tasks');
-      unsubscribe = onSnapshot(
+      unsubscribeFirestore = onSnapshot(
         tasksCol,
         (snap) => {
           const list: AssignedTask[] = [];
@@ -157,7 +212,6 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         },
         (err) => {
-          // Gracefully ignore Firestore listener error (e.g. adblocker or offline)
           console.debug('Firestore tasks listener notice:', err.message);
         }
       );
@@ -166,9 +220,13 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (pollInterval) clearInterval(pollInterval);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      if (channel) channel.close();
+      if (unsubscribeFirestore) unsubscribeFirestore();
     };
-  }, [persistTasks]);
+  }, [refreshTasks, persistTasks]);
 
   // Assign a new task (by Managing Director or Admin)
   const assignTask = async (taskData: Omit<AssignedTask, 'id' | 'createdAt' | 'updatedAt'>): Promise<AssignedTask> => {
@@ -180,6 +238,13 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const updated = [newTask, ...tasks];
     persistTasks(updated);
+
+    // Sync to backend Express server immediately
+    fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newTask)
+    }).catch(() => {});
 
     // Save to Firestore in background
     try {
@@ -218,6 +283,13 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const taskToUpdate = updated.find((t) => t.id === taskId);
     if (!taskToUpdate) return;
 
+    // Sync to backend server
+    fetch(`/api/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(taskToUpdate)
+    }).catch(() => {});
+
     try {
       await updateDoc(doc(db, 'assigned_tasks', taskId), {
         status,
@@ -247,6 +319,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     persistTasks(updated);
 
+    const taskToUpdate = updated.find((t) => t.id === taskId);
+    if (taskToUpdate) {
+      fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskToUpdate)
+      }).catch(() => {});
+    }
+
     try {
       await updateDoc(doc(db, 'assigned_tasks', taskId), {
         isApprovedByMD: true,
@@ -264,6 +345,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = tasks.map((t) => (t.id === taskId ? { ...t, ...updates, updatedAt: now } : t));
     persistTasks(updated);
 
+    const taskToUpdate = updated.find((t) => t.id === taskId);
+    if (taskToUpdate) {
+      fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskToUpdate)
+      }).catch(() => {});
+    }
+
     try {
       await updateDoc(doc(db, 'assigned_tasks', taskId), { ...updates, updatedAt: now });
     } catch {
@@ -276,24 +366,14 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const updated = tasks.filter((t) => t.id !== taskId);
     persistTasks(updated);
 
+    fetch(`/api/tasks/${taskId}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+
     try {
       await deleteDoc(doc(db, 'assigned_tasks', taskId));
     } catch {
       // fallback
-    }
-  };
-
-  const refreshTasks = async () => {
-    try {
-      const res = await fetch('/api/tasks');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.tasks) {
-          persistTasks(data.tasks);
-        }
-      }
-    } catch {
-      // ignore
     }
   };
 

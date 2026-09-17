@@ -287,7 +287,7 @@ export const LoginView: React.FC = () => {
 
       {/* Minimal Footer */}
       <footer className="py-4 text-center text-xs text-slate-500 border-t border-slate-800/80">
-        <p>© {new Date().getFullYear()} Agency Workspace. Confidential Internal Portal.</p>
+        <p>All Rights reserved To Chahat Founder of SactanX</p>
       </footer>
     </div>
   );

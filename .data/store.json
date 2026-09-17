@@ -3,7 +3,7 @@
     "user_chahat": {
       "uid": "user_chahat",
       "name": "Chahat",
-      "designation": "Managing Director",
+      "designation": "Co-founder & Managing Director",
       "email": "chahathassanain@gmail.com",
       "role": "admin",
       "status": "active",
@@ -11,8 +11,8 @@
     },
     "user_saeed": {
       "uid": "user_saeed",
-      "name": "M. Saeed",
-      "designation": "CEO",
+      "name": "Saeed",
+      "designation": "Founder & CEO",
       "email": "saeed.digital.seo@gmail.com",
       "role": "admin",
       "status": "active",
@@ -20,26 +20,17 @@
     },
     "user_fatima": {
       "uid": "user_fatima",
-      "name": "Fatima Huma",
-      "designation": "Senior Editor / Admin",
+      "name": "Fatima",
+      "designation": "Co-founder & HR Manager",
       "email": "fatimahuma.english@gmail.com",
       "role": "admin",
-      "status": "active",
-      "createdAt": "2026-01-01T00:00:00.000Z"
-    },
-    "user_maham": {
-      "uid": "user_maham",
-      "name": "Maham Noor",
-      "designation": "Content Creator Head",
-      "email": "mahamnoor.digital@gmail.com",
-      "role": "member",
       "status": "active",
       "createdAt": "2026-01-01T00:00:00.000Z"
     },
     "user_remsha": {
       "uid": "user_remsha",
       "name": "Remsha",
-      "designation": "Social Media Head",
+      "designation": "Social Media Director",
       "email": "bangashremsha0@gmail.com",
       "role": "member",
       "status": "active",
@@ -47,7 +38,7 @@
     },
     "user_shawal": {
       "uid": "user_shawal",
-      "name": "Shawal Manzoor",
+      "name": "Shawal",
       "designation": "Technical Head",
       "email": "shawalmanzoor865@gmail.com",
       "role": "member",
@@ -56,8 +47,8 @@
     },
     "user_malaika": {
       "uid": "user_malaika",
-      "name": "Malaika Atiq",
-      "designation": "Internee",
+      "name": "Malaika",
+      "designation": "Graphic Designer",
       "email": "bq76239@gmail.com",
       "role": "member",
       "status": "active",
@@ -68,35 +59,84 @@
       "name": "Neha Shah",
       "designation": "Internee",
       "email": "nehashaah45@gmail.com",
-      "role": "member",
+      "role": "intern",
       "status": "active",
       "createdAt": "2026-01-01T00:00:00.000Z"
     }
   },
   "entries": [
     {
+      "id": "entry_chahat_1",
       "userId": "user_chahat",
       "userName": "Chahat",
+      "userDesignation": "Co-founder & Managing Director",
+      "userRole": "admin",
       "date": "2026-09-04",
-      "completedToday": "Tested API sync",
-      "id": "entry_1788546730859_ebbvw1i"
+      "completedToday": "Reviewed agency task sync and verified system status across all team portals.",
+      "activities": "Executive operations and system oversight.",
+      "createdAt": "2026-09-04T12:00:00.000Z"
     }
   ],
   "resetPasswords": {},
   "credentials": {
-    "chahathassanain@gmail.com": "Tahahc26",
+    "chahathassanain@gmail.com": "Tahahc2020",
     "saeed.digital.seo@gmail.com": "agency2026",
     "fatimahuma.english@gmail.com": "agency2026",
-    "mahamnoor.digital@gmail.com": "agency2026",
     "bangashremsha0@gmail.com": "agency2026",
     "shawalmanzoor865@gmail.com": "agency2026",
     "bq76239@gmail.com": "agency2026",
     "nehashaah45@gmail.com": "agency2026",
     "saeed@agency.com": "agency2026",
     "fatima@agency.com": "agency2026",
-    "maham@agency.com": "agency2026",
     "remsha@agency.com": "agency2026",
     "shawal@agency.com": "agency2026"
   },
-  "tasks": []
+  "tasks": [
+    {
+      "id": "task_remsha_1",
+      "title": "Schedule Weekly Content Calendar on Meta Business Suite",
+      "description": "Queue and schedule all approved posts, reels, and stories for Monday through Sunday.",
+      "assignedToUid": "user_remsha",
+      "assignedToName": "Remsha",
+      "assignedToDesignation": "Social Media Director",
+      "assignedByUid": "user_chahat",
+      "assignedByName": "Chahat",
+      "assignedByRole": "Managing Director",
+      "priority": "high",
+      "dueDate": "2026-09-20",
+      "status": "in_progress",
+      "completionNotes": "Caption copy finalized. Waiting on graphic asset render before final scheduling.",
+      "createdAt": "2026-09-05T09:15:00.000Z"
+    },
+    {
+      "id": "task_shawal_1",
+      "title": "Technical Infrastructure & System Architecture Audit",
+      "description": "Ensure real-time sync endpoints and performance optimization across all team devices.",
+      "assignedToUid": "user_shawal",
+      "assignedToName": "Shawal",
+      "assignedToDesignation": "Technical Head",
+      "assignedByUid": "user_chahat",
+      "assignedByName": "Chahat",
+      "assignedByRole": "Managing Director",
+      "priority": "high",
+      "dueDate": "2026-09-21",
+      "status": "in_progress",
+      "createdAt": "2026-09-05T11:00:00.000Z"
+    },
+    {
+      "id": "task_malaika_1",
+      "title": "Brand Style Guide & Vector Graphic Assets",
+      "description": "Build high-converting visual graphics, branding templates, and export vector SVG illustrations.",
+      "assignedToUid": "user_malaika",
+      "assignedToName": "Malaika",
+      "assignedToDesignation": "Graphic Designer",
+      "assignedByUid": "user_chahat",
+      "assignedByName": "Chahat",
+      "assignedByRole": "Managing Director",
+      "priority": "high",
+      "dueDate": "2026-09-22",
+      "status": "pending",
+      "createdAt": "2026-09-05T10:00:00.000Z"
+    }
+  ]
 }

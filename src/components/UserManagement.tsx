@@ -39,7 +39,7 @@ export const UserManagement: React.FC = () => {
     provisionUserDirect,
     deleteUserDirect
   } = useAuth();
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin' || (currentUser?.role as string) === 'super_admin';
 
   const [searchFilter, setSearchFilter] = useState('');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -134,8 +134,8 @@ export const UserManagement: React.FC = () => {
     setEditName(u.name || '');
     setEditEmail(u.email || '');
     setEditDesignation(u.designation || '');
-    setEditRole(u.role);
-    const existingPass = u.password || getStoredPassword(u.email || '') || 'agency2026';
+    setEditRole((u.role as string) === 'super_admin' ? 'admin' : u.role);
+    const existingPass = u.password || getStoredPassword(u.email || '') || (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
     setEditPassword(existingPass);
     setEditError(null);
     setShowEditPassword(false);
@@ -165,15 +165,6 @@ export const UserManagement: React.FC = () => {
       return;
     }
 
-    // Check if promoting to admin would exceed the 3 admin accounts limit
-    if (editRole === 'admin' && editingUser.role !== 'admin') {
-      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
-      if (currentAdminCount >= 3) {
-        setEditError('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be promoted.');
-        return;
-      }
-    }
-
     // Check if new email is already taken by another user
     const duplicate = allUsers.find(
       (u) => u.uid !== editingUser.uid && u.email && u.email.trim().toLowerCase() === trimmedEmail
@@ -185,16 +176,19 @@ export const UserManagement: React.FC = () => {
 
     setEditSaving(true);
     try {
+      const isSelf = editingUser.uid === currentUser?.uid || 
+        (editingUser.email && currentUser?.email && editingUser.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim());
+
       const payload: any = {
         name: trimmedName,
         email: trimmedEmail,
         designation: trimmedDesignation,
-        password: trimmedPassword,
-        role: editRole
+        role: isSelf ? editingUser.role : editRole,
+        ...(isSelf ? {} : { password: trimmedPassword })
       };
 
       await updateUserProfile(editingUser.uid, payload);
-      setSuccessToast(`Credentials updated for ${trimmedName}! New Email: ${trimmedEmail}`);
+      setSuccessToast(`Credentials updated for ${trimmedName}!`);
       setEditingUser(null);
     } catch (err: any) {
       setEditError(err.message || 'Failed to update user.');
@@ -205,8 +199,16 @@ export const UserManagement: React.FC = () => {
 
   // Delete User
   const handleDeleteUser = async (u: UserProfile) => {
-    const adminCount = allUsers.filter(user => user.role === 'admin').length;
-    if (u.role === 'admin' && adminCount <= 1) {
+    const isSelf = u.uid === currentUser?.uid || 
+      (u.email && currentUser?.email && u.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim());
+    
+    if (isSelf) {
+      alert('Security Protection: You cannot delete or revoke your own account.');
+      return;
+    }
+
+    const adminCount = allUsers.filter(user => user.role === 'admin' || (user.role as string) === 'super_admin').length;
+    if ((u.role === 'admin' || (u.role as string) === 'super_admin') && adminCount <= 1) {
       alert('Cannot delete the only remaining Admin account in the system.');
       return;
     }
@@ -246,15 +248,6 @@ export const UserManagement: React.FC = () => {
     if (trimmedPassword.length < 4) {
       setAddError('Password must be at least 4 characters long.');
       return;
-    }
-
-    // Check 3-admin limit
-    if (newRole === 'admin') {
-      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
-      if (currentAdminCount >= 3) {
-        setAddError('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be created.');
-        return;
-      }
     }
 
     // Check duplicate email
@@ -535,7 +528,7 @@ export const UserManagement: React.FC = () => {
                 ) : (
                   activeUsers.map((u) => {
                     const isPasswordShown = !!visiblePasswords[u.uid];
-                    const effectivePassword = u.password || getStoredPassword(u.email || '') || 'agency2026';
+                    const effectivePassword = u.password || getStoredPassword(u.email || '') || (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
 
                     return (
                       <tr key={u.uid} className="hover:bg-slate-50/70 transition-colors">
@@ -619,14 +612,23 @@ export const UserManagement: React.FC = () => {
                             </button>
 
                             {isAdmin && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteUser(u)}
-                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                title="Revoke & Delete"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              (u.uid === currentUser?.uid || (u.email && currentUser?.email && u.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim())) ? (
+                                <span
+                                  className="p-1 rounded-lg text-slate-300 cursor-not-allowed"
+                                  title="Cannot delete your own account"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUser(u)}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  title="Revoke & Delete"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )
                             )}
                           </div>
                         </td>
@@ -640,164 +642,224 @@ export const UserManagement: React.FC = () => {
         </div>
 
         {/* MODAL 1: Edit Member & Credentials */}
-        {editingUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Edit Member & Credentials</h3>
-                  <p className="text-xs text-slate-500">Update contact info, role, login email and password.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditingUser(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+        {editingUser && (() => {
+          const isSelf = editingUser.uid === currentUser?.uid || 
+            (editingUser.email && currentUser?.email && editingUser.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim());
 
-              {editError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center space-x-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>{editError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSaveEdit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>Login Email Address *</span>
-                    <span className="text-[10px] text-indigo-600 font-medium">Used for Sign-in</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Changing this email updates the username this member uses to log in.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Designation (Job Title) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editDesignation}
-                    onChange={(e) => setEditDesignation(e.target.value)}
-                    placeholder="e.g. Graphic Designer, Content Creator Head, Developer"
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                {/* Password field for Admins */}
-                {isAdmin && (
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-5">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-semibold text-slate-700">
-                        Assigned Password *
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowEditPassword(!showEditPassword)}
-                          className="text-[11px] text-slate-500 hover:text-indigo-600 flex items-center gap-1 cursor-pointer"
-                        >
-                          {showEditPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                          <span>{showEditPassword ? 'Hide' : 'Show'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditPassword('agency2026')}
-                          className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer underline"
-                        >
-                          Default (agency2026)
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type={showEditPassword ? 'text' : 'password'}
-                      required
-                      value={editPassword}
-                      onChange={(e) => setEditPassword(e.target.value)}
-                      placeholder="Enter new password"
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Member will use this password to sign in immediately.
+                    <h3 className="text-base font-bold text-slate-900">
+                      {isSelf ? 'My Account Details' : 'Edit Member & Credentials'}
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {isSelf ? 'Update your name and designation.' : 'Update contact info, role, login email and password.'}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser(null)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {isSelf && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div className="leading-relaxed">
+                      <span className="font-bold">Self-Edit Restriction:</span> Admins cannot change their own role or password from the Admin Panel. To change your personal password, please use{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingUser(null);
+                          setIsAccountSettingsOpen(true);
+                        }}
+                        className="underline font-bold text-amber-950 hover:text-black cursor-pointer"
+                      >
+                        My Profile / Account Settings
+                      </button>
+                      .
+                    </div>
+                  </div>
                 )}
 
-                {/* Role selection available to all Admins */}
-                {isAdmin && (
+                {editError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-center space-x-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                    <span>{editError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveEdit} className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      System Role
+                      Full Name *
                     </label>
-                    <select
-                      value={editRole}
-                      onChange={(e) => setEditRole(e.target.value as UserRole)}
-                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-                    >
-                      <option value="admin">Admin</option>
-                      <option value="member">Member</option>
-                      <option value="intern">Intern</option>
-                    </select>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
                   </div>
-                )}
 
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  {isAdmin ? (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteUser(editingUser)}
-                      className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold cursor-pointer"
-                    >
-                      Revoke User
-                    </button>
-                  ) : <div></div>}
-
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditingUser(null)}
-                      className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={editSaving}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60"
-                    >
-                      {editSaving ? 'Saving...' : 'Save Changes'}
-                    </button>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Login Email Address *</span>
+                      <span className="text-[10px] text-indigo-600 font-medium">Used for Sign-in</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Changing this email updates the username this member uses to log in.
+                    </p>
                   </div>
-                </div>
-              </form>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Designation (Job Title) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editDesignation}
+                      onChange={(e) => setEditDesignation(e.target.value)}
+                      placeholder="e.g. Graphic Designer, Content Creator Head, Developer"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Password field: editable for OTHER users, locked with link for self */}
+                  {isAdmin && (
+                    isSelf ? (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Account Password
+                        </label>
+                        <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                          <span className="font-mono text-xs text-slate-600">•••••••• (Protected)</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUser(null);
+                              setIsAccountSettingsOpen(true);
+                            }}
+                            className="px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg cursor-pointer transition-colors"
+                          >
+                            Change in My Profile
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Admins must change their own password in My Profile by verifying their current password.
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-slate-700">
+                            Assigned Password *
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowEditPassword(!showEditPassword)}
+                              className="text-[11px] text-slate-500 hover:text-indigo-600 flex items-center gap-1 cursor-pointer"
+                            >
+                              {showEditPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              <span>{showEditPassword ? 'Hide' : 'Show'}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditPassword('agency2026')}
+                              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer underline"
+                            >
+                              Default (agency2026)
+                            </button>
+                          </div>
+                        </div>
+                        <input
+                          type={showEditPassword ? 'text' : 'password'}
+                          required
+                          value={editPassword}
+                          onChange={(e) => setEditPassword(e.target.value)}
+                          placeholder="Enter new password"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 font-mono text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          Member will use this password to sign in immediately.
+                        </p>
+                      </div>
+                    )
+                  )}
+
+                  {/* Role selection: editable for OTHER users, locked for self */}
+                  {isAdmin && (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        System Role
+                      </label>
+                      {isSelf ? (
+                        <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                          <span className="text-xs font-bold text-slate-800 capitalize">{editingUser.role}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">Cannot alter your own role</span>
+                        </div>
+                      ) : (
+                        <select
+                          value={editRole}
+                          onChange={(e) => setEditRole(e.target.value as UserRole)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="member">Member</option>
+                          <option value="intern">Intern</option>
+                        </select>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                    {isAdmin && !isSelf ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUser(editingUser)}
+                        className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold cursor-pointer"
+                      >
+                        Revoke User
+                      </button>
+                    ) : <div></div>}
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingUser(null)}
+                        className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={editSaving}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-60"
+                      >
+                        {editSaving ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* MODAL 2: Add New Member with Email & Password */}
         {isAddModalOpen && (
@@ -834,7 +896,7 @@ export const UserManagement: React.FC = () => {
                     required
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    placeholder="e.g. Maham Noor, Remsha, Shawal"
+                    placeholder="e.g. Remsha, Shawal, Malaika"
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -848,7 +910,7 @@ export const UserManagement: React.FC = () => {
                     required
                     value={newDesignation}
                     onChange={(e) => setNewDesignation(e.target.value)}
-                    placeholder="e.g. Content Creator Head, Social Media Head"
+                    placeholder="e.g. Social Media Director, Technical Head, Graphic Designer"
                     className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -951,7 +1013,7 @@ export const UserManagement: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">System Security Key</h3>
-                    <p className="text-xs text-slate-500">Administrator master recovery credential (Tahahc26).</p>
+                    <p className="text-xs text-slate-500">Administrator master recovery credential (Tahahc2020).</p>
                   </div>
                 </div>
                 <button

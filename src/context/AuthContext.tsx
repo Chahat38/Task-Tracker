@@ -34,6 +34,7 @@ interface AuthContextType {
   resetPasswordByEmail: (email: string) => Promise<void>;
   resetPasswordByRecoveryCode: (email: string, code: string, newPass: string) => Promise<{ success: boolean; message: string }>;
   updateUserProfile: (uid: string, updates: Partial<UserProfile>) => Promise<void>;
+  changeMyPassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   allUsers: UserProfile[];
   refreshUsers: () => Promise<void>;
   provisionUserDirect: (user: Partial<UserProfile> & { password?: string }) => Promise<void>;
@@ -46,14 +47,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const LOCAL_ROSTER_KEY = 'agency_authorized_roster_v4';
-const CREDENTIALS_VAULT_KEY = 'agency_credentials_vault_v2';
+const LOCAL_ROSTER_KEY = 'agency_authorized_roster_v5';
+const CREDENTIALS_VAULT_KEY = 'agency_credentials_vault_v3';
 
 const DEFAULT_CREDENTIALS: Record<string, string> = {
-  'chahathassanain@gmail.com': 'Tahahc26',
+  'chahathassanain@gmail.com': 'Tahahc2020',
   'saeed.digital.seo@gmail.com': 'agency2026',
   'fatimahuma.english@gmail.com': 'agency2026',
-  'mahamnoor.digital@gmail.com': 'agency2026',
   'bangashremsha0@gmail.com': 'agency2026',
   'shawalmanzoor865@gmail.com': 'agency2026',
   'bq76239@gmail.com': 'agency2026',
@@ -61,7 +61,6 @@ const DEFAULT_CREDENTIALS: Record<string, string> = {
   // Backward compatibility aliases
   'saeed@agency.com': 'agency2026',
   'fatima@agency.com': 'agency2026',
-  'maham@agency.com': 'agency2026',
   'remsha@agency.com': 'agency2026',
   'shawal@agency.com': 'agency2026'
 };
@@ -99,17 +98,17 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   {
     uid: 'user_chahat',
     name: 'Chahat',
-    designation: 'Managing Director',
+    designation: 'Co-founder & Managing Director',
     email: 'chahathassanain@gmail.com',
     role: 'admin',
     status: 'active',
-    password: 'Tahahc26',
+    password: 'Tahahc2020',
     createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
     uid: 'user_saeed',
-    name: 'M. Saeed',
-    designation: 'CEO',
+    name: 'Saeed',
+    designation: 'Founder & CEO',
     email: 'saeed.digital.seo@gmail.com',
     role: 'admin',
     status: 'active',
@@ -118,8 +117,8 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   },
   {
     uid: 'user_fatima',
-    name: 'Fatima Huma',
-    designation: 'Senior Editor / Admin',
+    name: 'Fatima',
+    designation: 'Co-founder & HR Manager',
     email: 'fatimahuma.english@gmail.com',
     role: 'admin',
     status: 'active',
@@ -127,19 +126,9 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
     createdAt: '2026-01-01T00:00:00.000Z'
   },
   {
-    uid: 'user_maham',
-    name: 'Maham Noor',
-    designation: 'Content Creator Head',
-    email: 'mahamnoor.digital@gmail.com',
-    role: 'member',
-    status: 'active',
-    password: 'agency2026',
-    createdAt: '2026-01-01T00:00:00.000Z'
-  },
-  {
     uid: 'user_remsha',
     name: 'Remsha',
-    designation: 'Social Media Head',
+    designation: 'Social Media Director',
     email: 'bangashremsha0@gmail.com',
     role: 'member',
     status: 'active',
@@ -148,7 +137,7 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   },
   {
     uid: 'user_shawal',
-    name: 'Shawal Manzoor',
+    name: 'Shawal',
     designation: 'Technical Head',
     email: 'shawalmanzoor865@gmail.com',
     role: 'member',
@@ -158,8 +147,8 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
   },
   {
     uid: 'user_malaika',
-    name: 'Malaika Atiq',
-    designation: 'Internee',
+    name: 'Malaika',
+    designation: 'Graphic Designer',
     email: 'bq76239@gmail.com',
     role: 'member',
     status: 'active',
@@ -171,7 +160,7 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
     name: 'Neha Shah',
     designation: 'Internee',
     email: 'nehashaah45@gmail.com',
-    role: 'member',
+    role: 'intern',
     status: 'active',
     password: 'agency2026',
     createdAt: '2026-01-01T00:00:00.000Z'
@@ -179,11 +168,10 @@ export const DEFAULT_AUTHORIZED_ROSTER: UserProfile[] = [
 ];
 
 const LEGACY_EMAIL_MIGRATIONS: Record<string, { newEmail: string; name: string; designation: string; role: UserRole }> = {
-  'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'M. Saeed', designation: 'CEO', role: 'admin' },
-  'fatima@agency.com': { newEmail: 'fatimahuma.english@gmail.com', name: 'Fatima Huma', designation: 'Senior Editor / Admin', role: 'admin' },
-  'maham@agency.com': { newEmail: 'mahamnoor.digital@gmail.com', name: 'Maham Noor', designation: 'Content Creator Head', role: 'member' },
-  'remsha@agency.com': { newEmail: 'bangashremsha0@gmail.com', name: 'Remsha', designation: 'Social Media Head', role: 'member' },
-  'shawal@agency.com': { newEmail: 'shawalmanzoor865@gmail.com', name: 'Shawal Manzoor', designation: 'Technical Head', role: 'member' }
+  'saeed@agency.com': { newEmail: 'saeed.digital.seo@gmail.com', name: 'Saeed', designation: 'Founder & CEO', role: 'admin' },
+  'fatima@agency.com': { newEmail: 'fatimahuma.english@gmail.com', name: 'Fatima', designation: 'Co-founder & HR Manager', role: 'admin' },
+  'remsha@agency.com': { newEmail: 'bangashremsha0@gmail.com', name: 'Remsha', designation: 'Social Media Director', role: 'member' },
+  'shawal@agency.com': { newEmail: 'shawalmanzoor865@gmail.com', name: 'Shawal', designation: 'Technical Head', role: 'member' }
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -201,11 +189,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           parsed.forEach((u: UserProfile) => {
             const rawEmail = (u.email || '').toLowerCase().trim();
+            const rawName = (u.name || '').toLowerCase().trim();
+            // Completely exclude and purge Maham Noor
+            if (rawEmail.includes('maham') || rawName.includes('maham') || u.uid === 'user_maham') {
+              return;
+            }
+
             const mig = LEGACY_EMAIL_MIGRATIONS[rawEmail];
             const finalEmail = mig ? mig.newEmail : rawEmail;
             const finalName = mig ? mig.name : u.name;
             const finalDesignation = mig ? mig.designation : u.designation;
-            const finalRole = mig ? mig.role : u.role;
+            const finalRole = mig ? mig.role : ((u.role as string) === 'super_admin' ? 'admin' : u.role);
 
             const def = DEFAULT_AUTHORIZED_ROSTER.find((d) => d.uid === u.uid || d.email.toLowerCase() === finalEmail);
             const password = u.password || getStoredPassword(finalEmail) || def?.password || 'agency2026';
@@ -226,6 +220,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               saveStoredPassword(mergedUser.email, password);
             }
           });
+
+          // Ensure user_maham is deleted
+          map.delete('user_maham');
 
           const result = Array.from(map.values());
           try {
@@ -292,6 +289,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             let hasChanges = false;
             data.users.forEach((u: UserProfile) => {
+              if (
+                u.uid === 'user_maham' ||
+                u.email?.toLowerCase().includes('maham') ||
+                u.name?.toLowerCase().includes('maham')
+              ) {
+                return;
+              }
+
               const prevUser = map.get(u.uid);
               const serverPass = u.password;
               const currentPass = prevUser?.password || getStoredPassword(u.email || '');
@@ -304,7 +309,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 serverPass ||
                 prevUser?.password ||
                 getStoredPassword(u.email || '') ||
-                'agency2026';
+                (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
 
               map.set(u.uid, {
                 ...prevUser,
@@ -316,6 +321,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 saveStoredPassword(u.email, password);
               }
             });
+
+            // Always ensure user_maham is absent
+            map.delete('user_maham');
 
             if (!hasChanges && map.size === prev.length) {
               return prev;
@@ -369,7 +377,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         (snapshot) => {
           const loaded: UserProfile[] = [];
           snapshot.forEach((d) => {
-            loaded.push({ ...(d.data() as UserProfile), uid: d.id });
+            const data = d.data() as UserProfile;
+            if (
+              d.id === 'user_maham' ||
+              data.email?.toLowerCase().includes('maham') ||
+              data.name?.toLowerCase().includes('maham')
+            ) {
+              return;
+            }
+            loaded.push({ ...data, uid: d.id });
           });
           if (loaded.length > 0) {
             setAllUsers((prev) => {
@@ -381,7 +397,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   u.password ||
                   prevUser?.password ||
                   getStoredPassword(u.email || '') ||
-                  'agency2026';
+                  (u.email?.toLowerCase() === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026');
                 map.set(u.uid, {
                   ...prevUser,
                   ...u,
@@ -417,12 +433,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const storedUid = localStorage.getItem('agency_user_uid');
 
     if (storedUid) {
-      const found = allUsers.find((u) => u.uid === storedUid);
-      if (found) {
-        setCurrentUser(found);
-      } else if (storedUid === 'user_chahat') {
-        const chahat = DEFAULT_AUTHORIZED_ROSTER[0];
-        setCurrentUser(chahat);
+      if (storedUid === 'user_maham') {
+        localStorage.removeItem('agency_user_uid');
+        setCurrentUser(null);
+      } else {
+        const found = allUsers.find((u) => u.uid === storedUid);
+        if (found) {
+          if (found.email?.toLowerCase().includes('maham') || found.name?.toLowerCase().includes('maham')) {
+            localStorage.removeItem('agency_user_uid');
+            setCurrentUser(null);
+          } else {
+            setCurrentUser(found);
+          }
+        } else if (storedUid === 'user_chahat') {
+          const chahat = DEFAULT_AUTHORIZED_ROSTER[0];
+          setCurrentUser(chahat);
+        }
       }
     }
 
@@ -430,6 +456,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setFirebaseUser(fbUser);
       if (fbUser && fbUser.email) {
         const userEmail = fbUser.email.toLowerCase();
+        if (userEmail.includes('maham')) {
+          localStorage.removeItem('agency_user_uid');
+          setCurrentUser(null);
+          return;
+        }
         const found = allUsers.find((u) => u.email?.toLowerCase() === userEmail);
         if (found) {
           localStorage.setItem('agency_user_uid', found.uid);
@@ -451,6 +482,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!trimmedEmail || !trimmedPass) {
       throw new Error('Please provide both email address and password.');
+    }
+
+    if (trimmedEmail.includes('maham')) {
+      throw new Error('This user account has been permanently removed from the workspace.');
     }
 
     // 1. LIVE SERVER AUTHENTICATION: Direct real-time check against central database
@@ -486,7 +521,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else if (resp.status === 401) {
         // Check if admin is using system master key or local override before failing
-        const isMaster = trimmedPass === 'Tahahc26' || trimmedPass.toLowerCase() === 'tahahc26';
+        const isMaster = trimmedPass === 'Tahahc2020' || trimmedPass.toLowerCase() === 'tahahc2020';
         if (!isMaster) {
           const errData = await resp.json().catch(() => ({}));
           throw new Error(errData.error || 'Incorrect password. Please verify and try again.');
@@ -552,21 +587,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let assignedPassword = (
       matchedUser.password ||
       getStoredPassword(trimmedEmail) ||
-      'agency2026'
+      (trimmedEmail === 'chahathassanain@gmail.com' ? 'Tahahc2020' : 'agency2026')
     ).trim();
 
-    const isAdminUser = matchedUser.role === 'admin';
+    const isChahat = trimmedEmail === 'chahathassanain@gmail.com';
+    const isAdminUser = matchedUser.role === 'admin' || (matchedUser.role as string) === 'super_admin' || isChahat;
 
     const isMasterRecoveryKey =
       isAdminUser &&
-      (trimmedPass === 'Tahahc26' ||
-        trimmedPass.toLowerCase() === 'tahahc26' ||
+      (trimmedPass === 'Tahahc2020' ||
+        trimmedPass.toLowerCase() === 'tahahc2020' ||
+        trimmedPass === 'COFOUNDER-AGENCY-2026');
+
+    // Chahat (Managing Director) can log in with Tahahc2020, agency2026, or custom password
+    const isChahatMatch =
+      isChahat &&
+      (trimmedPass.toLowerCase() === 'tahahc2020' ||
+        trimmedPass.toLowerCase() === 'agency2026' ||
         trimmedPass === 'COFOUNDER-AGENCY-2026');
 
     let isPasswordMatch =
       trimmedPass === assignedPassword ||
       trimmedPass.toLowerCase() === assignedPassword.toLowerCase() ||
-      isMasterRecoveryKey;
+      isMasterRecoveryKey ||
+      isChahatMatch;
 
     // If local password does not match, attempt checking cloud Firestore for updated password
     if (!isPasswordMatch && matchedUser.uid) {
@@ -594,6 +638,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Incorrect password. Please verify and try again.');
     }
 
+    // Ensure role is admin if super_admin or if Chahat
+    if (isChahat || (matchedUser.role as string) === 'super_admin') {
+      matchedUser = { ...matchedUser, role: 'admin' };
+    }
+
     // Successful login: persist user credentials and session
     if (matchedUser.email && trimmedPass && !isMasterRecoveryKey) {
       saveStoredPassword(matchedUser.email, trimmedPass);
@@ -608,13 +657,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const keyLower = trimmedKey.toLowerCase();
 
     if (
-      trimmedKey === 'Tahahc26' ||
-      keyLower === 'tahahc26' ||
+      trimmedKey === 'Tahahc2020' ||
+      keyLower === 'tahahc2020' ||
       trimmedKey === 'COFOUNDER-AGENCY-2026'
     ) {
       const adminUser =
-        (email ? allUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase()) : null) ||
-        allUsers.find((u) => u.role === 'admin') ||
+        allUsers.find((u) => u.email?.toLowerCase() === 'chahathassanain@gmail.com') ||
+        allUsers.find((u) => u.role === 'admin' || (u.role as string) === 'super_admin') ||
         DEFAULT_AUTHORIZED_ROSTER[0];
       const normalizedUser = { ...adminUser, role: 'admin' as const };
       localStorage.setItem('agency_user_uid', normalizedUser.uid);
@@ -652,8 +701,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resetPasswordByRecoveryCode = async (email: string, code: string, newPass: string) => {
     const trimmedCode = code.trim();
     const isMasterCode =
-      trimmedCode === 'Tahahc26' ||
-      trimmedCode.toLowerCase() === 'tahahc26' ||
+      trimmedCode === 'Tahahc2020' ||
+      trimmedCode.toLowerCase() === 'tahahc2020' ||
       trimmedCode === 'COFOUNDER-AGENCY-2026';
 
     const normEmail = email.trim().toLowerCase();
@@ -680,14 +729,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserProfile = async (uid: string, updates: Partial<UserProfile>) => {
     const targetUser = allUsers.find((u) => u.uid === uid);
-
-    if (updates.role === 'admin' && targetUser && targetUser.role !== 'admin') {
-      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
-      if (currentAdminCount >= 3) {
-        throw new Error('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be promoted.');
-      }
-    }
-
     const finalEmail = (updates.email || targetUser?.email || currentUser?.email || '').trim().toLowerCase();
     const finalPassword = (updates.password || targetUser?.password || currentUser?.password || '').trim();
 
@@ -696,7 +737,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: finalEmail || updates.email,
       password: finalPassword || updates.password,
       updatedAt: new Date().toISOString(),
-      updatedBy: currentUser?.name || currentUser?.email || 'Admin'
+      updatedBy: currentUser?.name || currentUser?.email || 'Managing Director'
     };
 
     const updatedRoster = allUsers.map((u) => (u.uid === uid ? { ...u, ...updatedData } : u));
@@ -716,12 +757,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Update backend Express server
     try {
-      await fetch('/api/admin/update-credentials', {
+      const res = await fetch('/api/admin/update-credentials', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-email': currentUser?.email || ''
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid,
           name: updatedData.name,
@@ -729,11 +767,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           designation: updatedData.designation,
           role: updatedData.role,
           password: finalPassword,
-          status: updatedData.status
+          status: updatedData.status,
+          adminUid: currentUser?.uid,
+          adminEmail: currentUser?.email
         })
       });
-    } catch {
-      // quiet fallback
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update user credentials on server.');
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('Permission Denied')) {
+        throw err;
+      }
+      // quiet fallback for network/offline
     }
 
     try {
@@ -743,15 +790,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Direct provision by Administrator
-  const provisionUserDirect = async (user: Partial<UserProfile> & { password?: string }) => {
-    if (user.role === 'admin') {
-      const currentAdminCount = allUsers.filter((u) => u.role === 'admin').length;
-      if (currentAdminCount >= 3) {
-        throw new Error('Admin limit reached. Exactly 3 admin accounts are permitted. A 4th admin cannot be created.');
-      }
+  // Dedicated self-service password update for admins and members
+  const changeMyPassword = async (currentPassword: string, newPassword: string) => {
+    if (!currentUser) throw new Error('You must be logged in to change your password.');
+    const res = await fetch('/api/user/change-my-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid: currentUser.uid,
+        email: currentUser.email,
+        currentPassword,
+        newPassword
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to change password.');
     }
 
+    const normEmail = (currentUser.email || '').toLowerCase().trim();
+    saveStoredPassword(normEmail, newPassword.trim());
+    setCurrentUser((prev) => (prev ? { ...prev, password: newPassword.trim() } : null));
+    setAllUsers((prev) =>
+      prev.map((u) => (u.uid === currentUser.uid ? { ...u, password: newPassword.trim() } : u))
+    );
+    return { success: true, message: data.message || 'Password updated successfully.' };
+  };
+
+  // Direct provision by Managing Director
+  const provisionUserDirect = async (user: Partial<UserProfile> & { password?: string }) => {
     const uid = user.uid || `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const finalEmail = user.email?.trim().toLowerCase() || '';
     const finalPassword = user.password?.trim() || 'agency2026';
@@ -778,10 +845,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await fetch('/api/admin/provision-user', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-email': currentUser?.email || ''
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid,
           name: newProfile.name,
@@ -802,22 +866,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Direct delete by Administrator
+  // Direct delete by Managing Director
   const deleteUserDirect = async (uid: string) => {
     const target = allUsers.find((u) => u.uid === uid);
     const updated = allUsers.filter((u) => u.uid !== uid);
     persistRoster(updated);
 
     try {
-      await fetch('/api/admin/delete-user', {
+      const res = await fetch('/api/admin/delete-user', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-admin-email': currentUser?.email || ''
-        },
-        body: JSON.stringify({ uid })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid,
+          adminUid: currentUser?.uid,
+          adminEmail: currentUser?.email
+        })
       });
-    } catch {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete user.');
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('Permission Denied')) {
+        throw err;
+      }
       // fallback
     }
 
@@ -1013,6 +1085,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetPasswordByEmail,
         resetPasswordByRecoveryCode,
         updateUserProfile,
+        changeMyPassword,
         allUsers,
         refreshUsers,
         provisionUserDirect,

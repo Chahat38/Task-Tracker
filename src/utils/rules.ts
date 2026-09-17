@@ -1,7 +1,7 @@
 import { UserRole } from '../types';
 
 /**
- * SPECIAL UI RULE FOR MAHAM, REMSHA & SHAWAL:
+ * SPECIAL UI RULE FOR REMSHA & SHAWAL:
  * Even though their system "role" is technically "member," they must NEVER
  * be shown with a role/label badge like "Member", "Employee", or "Admin" anywhere in the UI.
  * Only their name and designation should be displayed for them — no role tag at all.
@@ -11,8 +11,6 @@ export function isSpecialNoRoleMember(name?: string, designation?: string): bool
   const n = (name || '').toLowerCase().trim();
   const d = (designation || '').toLowerCase().trim();
 
-  // Check for Maham / Maham Noor
-  if (n.includes('maham') || d.includes('content creator head')) return true;
   // Check for Remsha
   if (n.includes('remsha') || d.includes('social media head')) return true;
   // Check for Shawal
@@ -23,7 +21,8 @@ export function isSpecialNoRoleMember(name?: string, designation?: string): bool
 
 /**
  * Returns role display label, or null if the role label must NOT be shown.
- * - Maham, Remsha, Shawal: returns null (NO role tag at all)
+ * - Remsha, Shawal: returns null (NO role tag at all)
+ * - super_admin: returns null (never expose super_admin as user-facing label/dropdown)
  * - admin: returns "Admin"
  * - member: returns "Member"
  * - intern: returns "Intern"
@@ -32,7 +31,7 @@ export function getRoleBadgeLabel(name: string, role: UserRole, designation?: st
   if (isSpecialNoRoleMember(name, designation)) {
     return null;
   }
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'super_admin') {
     return 'Admin';
   }
   if (role === 'member') {
@@ -50,6 +49,7 @@ export function getRoleBadgeLabel(name: string, role: UserRole, designation?: st
 export function getRoleBadgeStyle(role: UserRole): { bg: string; text: string; border: string } {
   switch (role) {
     case 'admin':
+    case 'super_admin' as any:
       return {
         bg: 'bg-amber-100',
         text: 'text-amber-700',
